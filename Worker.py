@@ -6,7 +6,7 @@ import lxml.html
 from time import sleep
 from dbConnection import Connection
 from datetime import datetime
-from message import Message
+from Message import Message
 
 xstr = lambda s: '' if s is None else str(s)
 

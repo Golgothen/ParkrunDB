@@ -2,7 +2,7 @@ from Worker import *
 from TerminalSize import *
 import argparse
 from sys import stdout
-from message import Message
+from Message import Message
 from TerminalSize import *
 
 class ProcInfo():

@@ -18,7 +18,10 @@ class Connection():
         self.cachedAgeCat = None
     
     def execute(self, sql):
-        return self.conn.execute(sql)
+        try:
+            return self.conn.execute(sql)
+        except:
+            raise
         
     def getParkrunID(self, parkrunName):
         if self.cachedParkrun is None:
@@ -49,18 +52,23 @@ class Connection():
 
     def addAthlete(self, athlete):
         sql = "SELECT AthleteID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID'])
-        #print(sql)
         c = self.execute(sql)
         if c.rowcount == 0:
-            sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, Club, AgeCategory, Gender, StravaID) VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', '" + xstr(athlete['Club']) + "', " + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "', '" + xstr(athlete['StravaID']) + "')"
-            #print(sql) 
-            c = self.execute(sql)
-            c.commit()
+            try:
+                sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, Club, AgeCategory, Gender, StravaID) VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', '" + xstr(athlete['Club']) + "', " + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "', '" + xstr(athlete['StravaID']) + "')"
+                c = self.execute(sql)
+                c.commit()
+            except pyodbc.Error as e:
+                c.rollback()
+                if e.args[0] == 23000:
+                    # On rare occasions, an athlete can be entered by another thread/process at the same time, causing a key violation.
+                    return
+                else:
+                    raise
             
     def addParkrunEventPosition(self, position):
         self.addAthlete(position)
         sql = "INSERT INTO EventPositions (EventID, AthleteID, Position, GunTime, AgeCategoryID, AgeGrade, Comment) VALUES (" + xstr(position['EventID']) + ", " + xstr(position['AthleteID']) + ", " + xstr(position['Pos']) + ", CAST('" + xstr(position['Time']) + "' as time(0)), " + xstr(self.getAgeCatID(position['Age Cat'])) + ", " + xstr(position['Age Grade']) + ", '" + xstr(position['Note']) + "')" 
-        #print(sql)
         c = self.execute(sql)
         c.commit()
     
