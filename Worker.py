@@ -6,10 +6,9 @@ import lxml.html
 from time import sleep
 from dbConnection import Connection
 from datetime import datetime
-from Message import Message
+from message import Message
 
 xstr = lambda s: '' if s is None else str(s)
-
 
 class Worker(multiprocessing.Process):
     def __init__(self, q, m, i):
@@ -31,19 +30,31 @@ class Worker(multiprocessing.Process):
                 self.msgQ.put(Message('Process', self.id, 'PID ' + xstr(self.pid) + ' exiting'))
                 break
             if parkrun['lastEvent'] is None: parkrun['lastEvent'] = 0
-            self.msgQ.put(Message('Process', self.id, 'PID ' + xstr(self.pid) + ' processing ' + parkrun['Name'] + ' from ' + xstr(parkrun['lastEvent'])))
             data = self.getEventHistory(parkrun['url'])
             if data is not None:
                 for row in data:
+                    row['Name'] = parkrun['Name']
+                    # Add the event if it's a new event
                     if row['EventNumber'] > parkrun['lastEvent']:
-                        row['Name'] = parkrun['Name']
+                        self.msgQ.put(Message('Process', self.id, 'Adding ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                         eventID = c.addParkrunEvent(row)
                         eData = self.getEvent(parkrun['url'], row['EventNumber'])
                         if eData is not None:
                             for eRow in eData:
                                 eRow['EventID'] = eventID
                                 c.addParkrunEventPosition(eRow)
-                            self.msgQ.put(Message('Process', self.id, 'Processed ' + parkrun['Name'] + ' event ' + xstr(row['EventNumber'])))
+                    else:
+                        self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                        # Check the event has the correct number of runners
+                        if not c.checkParkrunEvent(row):
+                            #if not, delete the old event record and reimport the data
+                            self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                            eventID = c.replaceParkrunEvent(row)
+                            eData = self.getEvent(parkrun['url'], row['EventNumber'])
+                            if eData is not None:
+                                for eRow in eData:
+                                    eRow['EventID'] = eventID
+                                    c.addParkrunEventPosition(eRow)
         c.close()
         
     def getURL(self, url):
@@ -154,7 +165,7 @@ class Worker(multiprocessing.Process):
         html = html.split('<div')[0]
         table = lxml.html.fromstring(html)
         
-        headings = ['EventNumber','EventDate']    
+        headings = ['EventNumber','EventDate','Runners']    
         rows = table.xpath('//tbody/tr')
         
         data = []
@@ -163,6 +174,8 @@ class Worker(multiprocessing.Process):
             for h, v in zip(headings, row.getchildren()):
                 if h == 'EventNumber':
                     d[h] = int(v.getchildren()[0].text)
+                if h == 'Runners':
+                    d[h] = int(v.text)
                 if h == 'EventDate':
                     d[h] = datetime.strptime(v.getchildren()[0].text,"%d/%m/%Y")
             data.insert(0,d)

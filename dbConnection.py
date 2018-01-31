@@ -50,6 +50,31 @@ class Connection():
         c.commit()
         return id
 
+    def replaceParkrunEvent(self, row):
+        sql = "SELECT EventID FROM getEventID('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")"
+        c = self.execute(sql)
+        if c.rowcount != 0:
+            id = int(c.fetchone()[0])
+            sql = "DELETE FROM Events WHERE EventID = " + xstr(id)
+            c = self.execute(sql)
+            c.commit()
+        sql = "INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['Name'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))"
+        c = self.execute(sql)
+        sql = "SELECT SCOPE_IDENTITY()"
+        c = self.execute(sql)
+        id = int(c.fetchone()[0])
+        c.commit()
+        return id
+
+    def checkParkrunEvent(self, row):
+        sql = "SELECT Runners FROM getParkrunEventRunners('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")"
+        c = self.execute(sql)
+        if c.rowcount == 0:
+            r = 0
+        else:
+            r = c.fetchone()[0]
+        return r == row['Runners']
+
     def addAthlete(self, athlete):
         sql = "SELECT AthleteID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID'])
         c = self.execute(sql)
@@ -71,6 +96,7 @@ class Connection():
         sql = "INSERT INTO EventPositions (EventID, AthleteID, Position, GunTime, AgeCategoryID, AgeGrade, Comment) VALUES (" + xstr(position['EventID']) + ", " + xstr(position['AthleteID']) + ", " + xstr(position['Pos']) + ", CAST('" + xstr(position['Time']) + "' as time(0)), " + xstr(self.getAgeCatID(position['Age Cat'])) + ", " + xstr(position['Age Grade']) + ", '" + xstr(position['Note']) + "')" 
         c = self.execute(sql)
         c.commit()
+
     
     def close(self):
         self.conn.close()

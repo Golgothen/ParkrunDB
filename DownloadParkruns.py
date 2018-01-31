@@ -2,8 +2,11 @@ from Worker import *
 from TerminalSize import *
 import argparse
 from sys import stdout
-from Message import Message
+from message import Message
 from TerminalSize import *
+
+termWidth = 0
+termHeight = 0
 
 class ProcInfo():
     def __init__(self, id, pid, message = ''):
@@ -26,24 +29,27 @@ def printxy(x, y, text):
 
 def paintScreen(procs):
     os.system('cls')
-    width, height = get_terminal_size()
-    stdout.write('-- Processes: --:-- PID --:--  Message  ' + (width - 40) * '-' + '\n')
+    global termWidth
+    global termHeight
+    termWidth, termHeight = get_terminal_size()
+    stdout.write('-- Processes: --:-- PID --:--  Message  ' + (termWidth - 40) * '-' + '\n')
     for p in procs:
-        
-        stdout.write(':   Process {:2.0f}  :  {:5.0f}  :  {:.{w}}'.format(p.id, p.pid, p.message, w = width - 29) + '\n')
-    stdout.write('-- Last Error Messages ' + (width - 23) * '-' + '\n')
+        stdout.write(':   Process {:2.0f}  :  {:5.0f}  :  {:.{w}}'.format(p.id, p.pid, p.message, w = termWidth - 29) + '\n')
+    stdout.write('-- Last Error Messages ' + (termWidth - 23) * '-' + '\n')
     for p in procs:
-        stdout.write(':   Process {:2.0f}  :  {:.{w}}'.format(p.id, p.error, w = width - 18) + '\n')
+        stdout.write(':   Process {:2.0f}  :  {:.{w}}'.format(p.id, p.error, w = termWidth - 18) + '\n')
 
 def updateScreen(procs):
     width, height = get_terminal_size()
-    for p in procs:
-        printxy(p.id+2, 30, '{:.{w}}'.format(p.message + (' ' * (width - 29)), w = width - 29))
-    for p in procs:
-        printxy(p.id+len(procs)+3, 19, '{:.{w}}'.format(p.error + (' ' * (width - 18)), w = width - 18))
+    if width != termWidth or height != termHeight:
+        paintScreen(procs)
+    else:
+        for p in procs:
+            printxy(p.id+2, 30, '{:.{w}}'.format(p.message + (' ' * (width - 29)), w = width - 29))
+        for p in procs:
+            printxy(p.id+len(procs)+3, 19, '{:.{w}}'.format(p.error + (' ' * (width - 18)), w = width - 18))
 
 def updateParkruns(countries, workerCount):
-    
     q = multiprocessing.Queue()     #Work Queue
     r = multiprocessing.Queue()     #Message Queue
 
@@ -90,6 +96,6 @@ def updateParkruns(countries, workerCount):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--processes', type = int, default = -1, help = 'Specify number of worker processes. Default is -1 (number of system cores)')
-    parser.add_argument('--country', nargs = '+', default = 'Australia',  help = 'Specify a country to import by name. Surround the country name with double quotes if it contains a space.')
+    parser.add_argument('--country', nargs = '+', default = ['Australia'],  help = 'Specify a country to import by name. Surround the country name with double quotes if it contains a space.')
     args = parser.parse_args()
     updateParkruns(args.country, args.processes)
