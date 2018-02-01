@@ -67,7 +67,7 @@ class Worker(multiprocessing.Process):
                 if e.code == 404:
                     self.msgQ.put(Message('Error',self.id, 'Bad URL ' + url))
                     return None
-                self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second', e.code))
+                self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
                 sleep(1)
             except:
                 self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
