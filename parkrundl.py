@@ -1,9 +1,10 @@
-from Worker import *
-from TerminalSize import *
+from worker import *
+from terminal_size import *
 import argparse
 from sys import stdout
 from message import Message
-from TerminalSize import *
+from parkrunlist import ParkrunList
+from enum import Enum
 
 termWidth = 0
 termHeight = 0
@@ -14,14 +15,6 @@ class ProcInfo():
         self.pid = pid
         self.message = message
         self.error = ''
-
-def getParkrunList(parkruns, q):
-    c = Connection()
-    for p in parkruns:
-        rs = c.execute("SELECT * FROM getLastImportedEventByCountry('" + p + "')")
-        for r in rs.fetchall():
-            q.put({'Name': r[0], 'url':r[1], 'lastEvent':r[2]})
-    c.close()
 
 def printxy(x, y, text):
     stdout.write("\x1b7\x1b[%d;%df%s\x1b8" % (x, y, text))
@@ -49,23 +42,41 @@ def updateScreen(procs):
         for p in procs:
             printxy(p.id+len(procs)+3, 19, '{:.{w}}'.format(p.error + (' ' * (width - 18)), w = width - 18))
 
-def updateParkruns(countries, workerCount):
-    q = multiprocessing.Queue()     #Work Queue
-    r = multiprocessing.Queue()     #Message Queue
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--processes', type = int, default = -1, help = 'Specify number of worker processes. Default is number of system cores.')
+    parser.add_argument('--country', nargs = '+',  help = 'Specify country/ies to import. Surround the name with double quotes if it contains a space.')
+    parser.add_argument('--region', nargs = '+',  help = 'Specify region/s to import. Surround the name with double quotes if it contains a space.')
+    parser.add_argument('--event', nargs = '+',  help = 'Specify event/s to import. Surround the name with double quotes if it contains a space.')
+    parser.add_argument('--mode', nargs = 1, default = ['Normal'], help = 'Valid modes are Normal, CheckURLs or NewEvents')
+    args = parser.parse_args()
 
-    if len(countries)==0:
-        print("No country supplied. Exiting.")
-        exit()
+    mode = Mode.default()
+    
+    #First, build a list of events that need to be checked.
+    l = ParkrunList()
+    if args.country is not None: l.addCountries(args.country)
+    if args.region is not None: l.addRegions(args.region)
+    if args.event is not None: l.addEvents(args.event)
 
-    if workerCount == -1:
+    mode = Mode[args.mode[0].upper()]
+    
+    if int(args.processes) == -1:
         processes = multiprocessing.cpu_count()
     else:
-        processes = int(workerCount)
+        processes = int(args.processes)
+    
+    # Define and fill the work queue
+    workQueue = multiprocessing.Queue()
+    for p in l:
+        workQueue.put(p)
+    
+    r = multiprocessing.Queue()     #Message Queue
 
     p = []
     procs = []
     for i in range(processes):
-        p.append(Worker(q, r, i))
+        p.append(Worker(workQueue, r, i, mode))
         p[i].start()
         procs.append(ProcInfo(i, p[i].pid))
     
@@ -78,11 +89,10 @@ def updateParkruns(countries, workerCount):
 
     paintScreen(procs)
         
-    getParkrunList(countries, q)            # Fill the queue
     for i in range(processes):
-        q.put(None)             # Add a poison pill for each process at the end of the queue.
+        workQueue.put(None)             # Add a poison pill for each process at the end of the queue.
     
-    while not q.empty():
+    while not WorkQueue.empty():
         m = r.get()
         if m.type == 'Error':
             procs[m.id].error = m.message
@@ -93,9 +103,23 @@ def updateParkruns(countries, workerCount):
     for x in p:
         x.join()
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--processes', type = int, default = -1, help = 'Specify number of worker processes. Default is -1 (number of system cores)')
-    parser.add_argument('--country', nargs = '+', default = ['Australia'],  help = 'Specify a country to import by name. Surround the country name with double quotes if it contains a space.')
-    args = parser.parse_args()
-    updateParkruns(args.country, args.processes)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

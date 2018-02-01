@@ -4,20 +4,30 @@ from urllib.error import HTTPError
 import os
 import lxml.html
 from time import sleep
-from dbConnection import Connection
+from dbconnection import Connection
 from datetime import datetime
 from message import Message
 
 xstr = lambda s: '' if s is None else str(s)
 
+class Mode(Enum):
+    NORMAL = 0
+    CHECKURLS = 1
+    NEWEVENTS = 2
+    
+    @classmethod
+    def default(cls):
+        return cls.NORMAL
+
 class Worker(multiprocessing.Process):
-    def __init__(self, q, m, i):
+    def __init__(self, q, m, i, mode):
         super(Worker, self).__init__()
         self.inQ = q  #input Queue
         #self.l = l
         #self.c = Connection()
         self.msgQ = m  #message queue
         self.id = i
+        self.mode = mode
         
     def run(self):
         c = Connection()
@@ -30,31 +40,35 @@ class Worker(multiprocessing.Process):
                 self.msgQ.put(Message('Process', self.id, 'Exiting'))
                 break
             if parkrun['lastEvent'] is None: parkrun['lastEvent'] = 0
-            data = self.getEventHistory(parkrun['url'])
-            if data is not None:
-                for row in data:
-                    row['Name'] = parkrun['Name']
-                    # Add the event if it's a new event
-                    if row['EventNumber'] > parkrun['lastEvent']:
-                        self.msgQ.put(Message('Process', self.id, 'Adding ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                        eventID = c.addParkrunEvent(row)
-                        eData = self.getEvent(parkrun['url'], row['EventNumber'])
-                        if eData is not None:
-                            for eRow in eData:
-                                eRow['EventID'] = eventID
-                                c.addParkrunEventPosition(eRow)
-                    else:
-                        self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                        # Check the event has the correct number of runners
-                        if not c.checkParkrunEvent(row):
-                            #if not, delete the old event record and reimport the data
-                            self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                            eventID = c.replaceParkrunEvent(row)
-                            eData = self.getEvent(parkrun['url'], row['EventNumber'])
-                            if eData is not None:
-                                for eRow in eData:
-                                    eRow['EventID'] = eventID
-                                    c.addParkrunEventPosition(eRow)
+            if self.mode == Mode.CHECKURLS:
+                pass
+            else:
+                data = self.getEventHistory(parkrun['url'])
+                if data is not None:
+                    for row in data:
+                        row['Name'] = parkrun['Name']
+                        # Add the event if it's a new event
+                        if self.mode == Mode.NORMAL or self.mode == Mode.NEWEVENTS:
+                            if row['EventNumber'] > parkrun['lastEvent']:
+                                self.msgQ.put(Message('Process', self.id, 'Adding ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                                eventID = c.addParkrunEvent(row)
+                                eData = self.getEvent(parkrun['url'], row['EventNumber'])
+                                if eData is not None:
+                                    for eRow in eData:
+                                        eRow['EventID'] = eventID
+                                        c.addParkrunEventPosition(eRow)
+                        if self.mode == Mode.NORMAL:
+                            self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                            # Check the event has the correct number of runners
+                            if not c.checkParkrunEvent(row):
+                                #if not, delete the old event record and reimport the data
+                                self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                                eventID = c.replaceParkrunEvent(row)
+                                eData = self.getEvent(parkrun['url'], row['EventNumber'])
+                                if eData is not None:
+                                    for eRow in eData:
+                                        eRow['EventID'] = eventID
+                                        c.addParkrunEventPosition(eRow)
         c.close()
         
     def getURL(self, url):
