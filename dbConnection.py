@@ -80,7 +80,7 @@ class Connection():
         c = self.execute(sql)
         if c.rowcount == 0:
             try:
-                sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, Club, AgeCategory, Gender, StravaID) VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', '" + xstr(athlete['Club']) + "', " + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "', '" + xstr(athlete['StravaID']) + "')"
+                sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, Club, AgeCategoryID, Gender, StravaID) VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', '" + xstr(athlete['Club']) + "', " + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "', '" + xstr(athlete['StravaID']) + "')"
                 c = self.execute(sql)
                 c.commit()
             except pyodbc.Error as e:

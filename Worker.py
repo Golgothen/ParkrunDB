@@ -21,13 +21,13 @@ class Worker(multiprocessing.Process):
         
     def run(self):
         c = Connection()
-        self.msgQ.put(Message('Process',self.id, 'PID ' + xstr(self.pid) + ' running'))
+        self.msgQ.put(Message('Process',self.id, 'Running'))
         while True:
             #self.l.acquire()
             parkrun = self.inQ.get()
             #self.l.release()
             if parkrun is None:
-                self.msgQ.put(Message('Process', self.id, 'PID ' + xstr(self.pid) + ' exiting'))
+                self.msgQ.put(Message('Process', self.id, 'Exiting'))
                 break
             if parkrun['lastEvent'] is None: parkrun['lastEvent'] = 0
             data = self.getEventHistory(parkrun['url'])
