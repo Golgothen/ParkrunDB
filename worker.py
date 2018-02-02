@@ -7,7 +7,7 @@ from time import sleep
 from dbconnection import Connection
 from datetime import datetime
 from message import Message
-
+from enum import Enum
 xstr = lambda s: '' if s is None else str(s)
 
 class Mode(Enum):
