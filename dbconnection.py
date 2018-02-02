@@ -1,4 +1,5 @@
 import pyodbc
+from pandas.io import sql
 
 xstr = lambda s: '' if s is None else str(s)
 
@@ -96,8 +97,12 @@ class Connection():
         sql = "INSERT INTO EventPositions (EventID, AthleteID, Position, GunTime, AgeCategoryID, AgeGrade, Comment) VALUES (" + xstr(position['EventID']) + ", " + xstr(position['AthleteID']) + ", " + xstr(position['Pos']) + ", CAST('" + xstr(position['Time']) + "' as time(0)), " + xstr(self.getAgeCatID(position['Age Cat'])) + ", " + xstr(position['Age Grade']) + ", '" + xstr(position['Note']) + "')" 
         c = self.execute(sql)
         c.commit()
-
     
+    def updateParkrunURL(self, parkrun, verified, valid):
+        sql = "UPDATE Parkruns SET URLVerified = " + str(int(verified)) + ", URLValid = " + str(int(valid)) + " WHERE ParkrunName = '" + parkrun + "'"
+        c = self.execute(sql)
+        c.commit()
+        
     def close(self):
         self.conn.close()
         del self.conn

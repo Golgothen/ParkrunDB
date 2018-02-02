@@ -4,7 +4,6 @@ import argparse
 from sys import stdout
 from message import Message
 from parkrunlist import ParkrunList
-from enum import Enum
 
 termWidth = 0
 termHeight = 0
@@ -92,7 +91,7 @@ if __name__ == '__main__':
     for i in range(processes):
         workQueue.put(None)             # Add a poison pill for each process at the end of the queue.
     
-    while not WorkQueue.empty():
+    while not workQueue.empty():
         m = r.get()
         if m.type == 'Error':
             procs[m.id].error = m.message
