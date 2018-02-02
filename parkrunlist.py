@@ -4,32 +4,37 @@ class ParkrunList():
     def __init__(self):
         self.__parkruns = {}
         self.__index = 0
-        self.__c = Connection()
         
-    def addCountries(self, countries):
+    def countries(self, countries, add = True):
         for c in countries:
             sql = "SELECT * FROM getLastImportedEventByCountry('" + c + "')"
-            cur = self.__c.execute(sql)
-            for row in cur.fetchall():
-                 if row[1] not in self.__parkruns:
-                     self.__parkruns[row[1]] = {'Name':row[0], 'url':row[1], 'lastEvent':row[2]}
+            self.__update(sql, add)
     
-    def addRegions(self, regions):
+    def regions(self, regions, add = True):
         for r in regions:
             sql = "SELECT * FROM getLastImportedEventByRegion('" + r + "')"
-            cur = self.__c.execute(sql)
-            for row in cur.fetchall():
-                 if row[1] not in self.__parkruns:
-                     self.__parkruns[row[1]] = {'Name':row[0], 'url':row[1], 'lastEvent':row[2]}
+            self.__update(sql, add)
     
-    def addEvents(self, events):
+    def events(self, events, add = True):
         for e in events:
-            sql = "SELECT * FROM getLastImportedEvent('" + e + "')"
-            cur = self.__c.execute(sql)
-            for row in cur.fetchall():
+            sql = "SELECT * FROM getLastImportedEventByEvent('" + e + "')"
+            self.__update(sql, add)
+    
+    def addAll(self):
+        sql = "SELECT * FROM getLastImportedEvent()"
+        self.__update(sql, True)
+
+    def __update(self, sql, add = True):
+        c = Connection()
+        cursor = c.execute(sql)
+        for row in cursor.fetchall():
+            if add:
                  if row[1] not in self.__parkruns:
                      self.__parkruns[row[1]] = {'Name':row[0], 'url':row[1], 'lastEvent':row[2]}
-    
+            else:
+                if row[1] in self.__parkruns:
+                    del self.__parkruns[row[1]]
+            
     def __iter__(self):
         for k in self.__parkruns.keys():
             yield self.__parkruns[k]

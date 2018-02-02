@@ -1,5 +1,4 @@
 import pyodbc
-from pandas.io import sql
 
 xstr = lambda s: '' if s is None else str(s)
 
