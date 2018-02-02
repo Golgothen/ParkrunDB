@@ -8,6 +8,7 @@ from dbconnection import Connection
 from datetime import datetime
 from message import Message
 from enum import Enum
+
 xstr = lambda s: '' if s is None else str(s)
 
 class Mode(Enum):
@@ -41,7 +42,12 @@ class Worker(multiprocessing.Process):
                 break
             if parkrun['lastEvent'] is None: parkrun['lastEvent'] = 0
             if self.mode == Mode.CHECKURLS:
-                pass
+                if self.getURL(parkrun['url']) is not None:
+                    c.updateParkrunURL(parkrun['Name'], True, True)
+                    self.msgQ.put(Message('Process', self.id, 'Verified ' + parkrun['Name'] + ' valid'))
+                else:
+                    c.updateParkrunURL(parkrun['Name'], True, False)
+                    self.msgQ.put(Message('Error', self.id, 'Could not verify ' + parkrun['Name'] + ' as valid'))
             else:
                 data = self.getEventHistory(parkrun['url'])
                 if data is not None:
@@ -61,7 +67,7 @@ class Worker(multiprocessing.Process):
                             self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             # Check the event has the correct number of runners
                             if not c.checkParkrunEvent(row):
-                                #if not, delete the old event record and reimport the data
+                                #if not, delete the old event record and re-import the data
                                 self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                                 eventID = c.replaceParkrunEvent(row)
                                 eData = self.getEvent(parkrun['url'], row['EventNumber'])
@@ -127,7 +133,10 @@ class Worker(multiprocessing.Process):
                 if h == 'parkrunner':
                     if len(v.getchildren())>0:
                         d['FirstName']=v.getchildren()[0].text.split()[0].replace("'","''")
-                        d['LastName']=v.getchildren()[0].text.split()[1].capitalize().replace("'","''")
+                        if len(v.getchildren()[0].text.split())>1:
+                            d['LastName']=v.getchildren()[0].text.split()[1].capitalize().replace("'","''")
+                        else:
+                            d['LastName'] = None
                         d['AthleteID']=int(v.getchildren()[0].get('href').split('=')[1])
                     else:
                         d['FirstName']=v.text.replace("'","''")
