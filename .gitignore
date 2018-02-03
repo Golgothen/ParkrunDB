@@ -4,4 +4,5 @@ parkrundl.log
 __pycache__/
 .project
 .pydevproject
+*.pyc
 
