@@ -48,33 +48,39 @@ class Worker(multiprocessing.Process):
                 else:
                     c.updateParkrunURL(parkrun['Name'], True, False)
                     self.msgQ.put(Message('Error', self.id, 'Could not verify ' + parkrun['Name'] + ' as valid'))
-            else:
+            
+            if self.mode == Mode.NEWEVENTS:
+                self.msgQ.put(Message('Process', self.id, 'Checking for new results for ' + parkrun['Name'] ))
+                parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'])
+                if data is not None:
+                    parkrun['Runners'] = len(data)
+                    # Add the event if it's a new event
+                    # Check the event has the correct number of runners
+                    if not c.checkParkrunEvent(parkrun):
+                        #if not, delete the old event record and re-import the data
+                        self.msgQ.put(Message('Process', self.id, 'Updating ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
+                        eventID = c.replaceParkrunEvent(parkrun)
+                        for row in data:
+                            row['EventID'] = eventID
+                            c.addParkrunEventPosition(row)
+                
+            if self.mode == Mode.NORMAL:
                 data = self.getEventHistory(parkrun['url'])
                 if data is not None:
                     for row in data:
                         row['Name'] = parkrun['Name']
                         # Add the event if it's a new event
-                        if self.mode == Mode.NORMAL or self.mode == Mode.NEWEVENTS:
-                            if row['EventNumber'] > parkrun['lastEvent']:
-                                self.msgQ.put(Message('Process', self.id, 'Adding ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                                eventID = c.addParkrunEvent(row)
-                                eData = self.getEvent(parkrun['url'], row['EventNumber'])
-                                if eData is not None:
-                                    for eRow in eData:
-                                        eRow['EventID'] = eventID
-                                        c.addParkrunEventPosition(eRow)
-                        if self.mode == Mode.NORMAL:
-                            self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                            # Check the event has the correct number of runners
-                            if not c.checkParkrunEvent(row):
-                                #if not, delete the old event record and re-import the data
-                                self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                                eventID = c.replaceParkrunEvent(row)
-                                eData = self.getEvent(parkrun['url'], row['EventNumber'])
-                                if eData is not None:
-                                    for eRow in eData:
-                                        eRow['EventID'] = eventID
-                                        c.addParkrunEventPosition(eRow)
+                        self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                        # Check the event has the correct number of runners
+                        if not c.checkParkrunEvent(row):
+                            #if not, delete the old event record and re-import the data
+                            self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                            eventID = c.replaceParkrunEvent(row)
+                            eData = self.getEvent(parkrun['url'], row['EventNumber'])
+                            if eData is not None:
+                                for eRow in eData:
+                                    eRow['EventID'] = eventID
+                                    c.addParkrunEventPosition(eRow)
         c.close()
         
     def getURL(self, url):
@@ -94,23 +100,10 @@ class Worker(multiprocessing.Process):
                 return None
         return f.read().decode('utf-8')
     
-    def getEvent(self, url, parkrunEvent):
-        url = url + "/results/weeklyresults/?runSeqNumber=" + str(parkrunEvent)
-        html = self.getURL(url)
-        #Test if we got a valid response'
-        if html is None:  #most likely a 404 error
-            self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
-            return None
-        if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
-            self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
-            return None
-        html = '<table' + html.split('<table')[1]
-        html = html.split('</p>')[0]
-        table = lxml.html.fromstring(html)
-        
+    def getEventTable(self, tableHTML):
         headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
         
-        rows = table.xpath('//tbody/tr')
+        rows = tableHTML.xpath('//tbody/tr')
         
         data = []
         
@@ -174,6 +167,44 @@ class Worker(multiprocessing.Process):
             data.append(d)
         return data
     
+    def getEvent(self, url, parkrunEvent):
+        url = url + "/results/weeklyresults/?runSeqNumber=" + str(parkrunEvent)
+        html = self.getURL(url)
+        #Test if we got a valid response'
+        if html is None:  #most likely a 404 error
+            self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
+            return None
+        if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+            self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
+            return None
+        html = '<table' + html.split('<table')[1]
+        html = html.split('</p>')[0]
+        table = lxml.html.fromstring(html)
+        return self.getEventTable(table)
+    
+    def getLatestEvent(self, url):
+        url = url + "/results/latestresults/"
+        html = self.getURL(url)
+        #Test if we got a valid response'
+        if html is None:  #most likely a 404 error
+            self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
+            return None
+        if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+            self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
+            return None
+        eventHTML = html.split('<h2>')[1]
+        eventHTML = eventHTML.split('</h2>')[0]
+        if len(eventHTML.split('#')[1].split('-')[0].strip()) == 0:
+            return 0, None, None
+        eventNumber =  int(eventHTML.split('#')[1].split('-')[0].strip())
+        eventDate = datetime.strptime(eventHTML[len(eventHTML)-10:],'%d/%m/%Y')
+        
+        html = '<table' + html.split('<table')[1]
+        html = html.split('</p>')[0]
+        table = lxml.html.fromstring(html)
+        return eventNumber, eventDate, self.getEventTable(table)
+    
+        
     def getEventHistory(self, url):
         url = url + "/results/eventhistory/"
         html = self.getURL(url)
