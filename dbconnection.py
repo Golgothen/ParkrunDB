@@ -1,6 +1,6 @@
 import pyodbc
 
-xstr = lambda s: '' if s is None else str(s)
+xstr = lambda s: 'NULL' if s is None else str(s)
 
 class Connection():
     def __init__(self):
@@ -16,6 +16,8 @@ class Connection():
 
         self.cachedParkrun = None
         self.cachedAgeCat = None
+        #self.cachedAthlete = None
+        self.cachedClub = None
     
     def execute(self, sql):
         try:
@@ -75,12 +77,39 @@ class Connection():
             r = c.fetchone()[0]
         return r == row['Runners']
 
+    def getClub(self, club):
+        if self.cachedClub is None:
+            self.cachedClub = {}
+            c = self.execute("SELECT ClubID, ClubName from Clubs")
+            for row in c.fetchall():
+                self.cachedClub[row[1]] = row[0]
+        if club is None: return None
+        if club not in self.cachedClub:
+            sql = "INSERT INTO Clubs (ClubName) VALUES ('" + club + "')"
+            c = self.execute(sql)
+            sql = "SELECT SCOPE_IDENTITY()"
+            c = self.execute(sql)
+            id = int(c.fetchone()[0])
+            c.commit()
+            self.cachedClub[club] = id
+            return id
+        else:
+            return self.cachedClub[club]
+            
     def addAthlete(self, athlete):
         sql = "SELECT AthleteID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID'])
         c = self.execute(sql)
         if c.rowcount == 0:
             try:
-                sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, Club, AgeCategoryID, Gender, StravaID) VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', '" + xstr(athlete['Club']) + "', " + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "', '" + xstr(athlete['StravaID']) + "')"
+                sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, AgeCategoryID, Gender"
+                values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', '"  + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) 
+                if athlete['Club'] is not None:
+                    sql += ", ClubID"
+                    values += "', " + xstr(self.getClu(bathlete['Club']))
+                if athlete['StravaID'] is not None:
+                    sql += ", StravaID"
+                    values += "', '" + xstr(athlete['StravaID'])
+                sql += ")" + values + ")"
                 c = self.execute(sql)
                 c.commit()
             except pyodbc.Error as e:
@@ -90,10 +119,33 @@ class Connection():
                     return
                 else:
                     raise
+        else:
+            r = c.fetchall()
+            sql = "UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete['Age Cat'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID'])
+            c = self.execute(sql)
+            sql = "UPDATE Athletes SET ClubID = " + xstr(self.getClub(athlete['Club'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID'])
+            c = self.execute(sql)
+            c.commit()
             
     def addParkrunEventPosition(self, position):
         self.addAthlete(position)
-        sql = "INSERT INTO EventPositions (EventID, AthleteID, Position, GunTime, AgeCategoryID, AgeGrade, Comment) VALUES (" + xstr(position['EventID']) + ", " + xstr(position['AthleteID']) + ", " + xstr(position['Pos']) + ", CAST('" + xstr(position['Time']) + "' as time(0)), " + xstr(self.getAgeCatID(position['Age Cat'])) + ", " + xstr(position['Age Grade']) + ", '" + xstr(position['Note']) + "')" 
+        sql = "INSERT INTO EventPositions (EventID, AthleteID, Position"
+        values = " VALUES (" + xstr(position['EventID']) + ", " + xstr(position['AthleteID']) + ", " + xstr(position['Pos'])
+
+        if position['Time'] is not  None:
+            sql += ", GunTime" 
+            values += ", CAST('" + xstr(position['Time']) + "' as time(0))"
+        if position['Age Cat'] is not  None:
+            sql += ", AgeCategoryID" 
+            values += ", " + xstr(self.getAgeCatID(position['Age Cat']))
+        if position['Age Grade'] is not  None:
+            sql += ", AgeGrade" 
+            values += ", " + xstr(position['Age Grade'])
+        if position['Note'] is not  None:
+            sql += ", Comment" 
+            values +=  ", '" + xstr(position['Note']) + "'"
+        sql += ")" + values + ")"
+        
         c = self.execute(sql)
         c.commit()
     

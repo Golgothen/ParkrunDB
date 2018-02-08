@@ -122,7 +122,7 @@ class Worker(multiprocessing.Process):
                     if v.text is not None:
                         d[h]=float(v.text.split()[0])
                     else:
-                        d[h]=0.0
+                        d[h]=None
                 if h == 'parkrunner':
                     if len(v.getchildren())>0:
                         d['FirstName']=v.getchildren()[0].text.split()[0].replace("'","''")
@@ -150,7 +150,7 @@ class Worker(multiprocessing.Process):
                     if len(v.getchildren())>0:
                         d[h]=v.getchildren()[0].text
                     else:
-                        d[h]=''
+                        d[h]=None
                 if h == 'Gender':
                     if v.text is not None:
                         d[h]=v.text
