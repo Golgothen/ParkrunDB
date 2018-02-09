@@ -30,7 +30,7 @@ class ParkrunList():
         for row in cursor.fetchall():
             if add:
                  if row[1] not in self.__parkruns:
-                     self.__parkruns[row[1]] = {'Name':row[0], 'url':row[1], 'lastEvent':row[2]}
+                     self.__parkruns[row[1]] = {'Name':row[0], 'url':row[1],  'EventHistory':row[2],  'EnentNumber':row[3],  'LatestResult':row[4], 'lastEvent':row[5]}
             else:
                 if row[1] in self.__parkruns:
                     del self.__parkruns[row[1]]

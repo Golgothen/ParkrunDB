@@ -24,8 +24,6 @@ class Worker(multiprocessing.Process):
     def __init__(self, q, m, i, mode):
         super(Worker, self).__init__()
         self.inQ = q  #input Queue
-        #self.l = l
-        #self.c = Connection()
         self.msgQ = m  #message queue
         self.id = i
         self.mode = mode
@@ -51,7 +49,7 @@ class Worker(multiprocessing.Process):
             
             if self.mode == Mode.NEWEVENTS:
                 self.msgQ.put(Message('Process', self.id, 'Checking for new results for ' + parkrun['Name'] ))
-                parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'])
+                parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'] + parkrun['LatestResult'])
                 if data is not None:
                     parkrun['Runners'] = len(data)
                     # Add the event if it's a new event
@@ -65,7 +63,7 @@ class Worker(multiprocessing.Process):
                             c.addParkrunEventPosition(row)
                 
             if self.mode == Mode.NORMAL:
-                data = self.getEventHistory(parkrun['url'])
+                data = self.getEventHistory(parkrun['url'] + parkrun['EventHistory'])
                 if data is not None:
                     for row in data:
                         row['Name'] = parkrun['Name']
@@ -76,7 +74,7 @@ class Worker(multiprocessing.Process):
                             #if not, delete the old event record and re-import the data
                             self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
-                            eData = self.getEvent(parkrun['url'], row['EventNumber'])
+                            eData = self.getEvent(parkrun['url'] + parkrun['EventNumber'], row['EventNumber'])
                             if eData is not None:
                                 for eRow in eData:
                                     eRow['EventID'] = eventID
@@ -105,6 +103,10 @@ class Worker(multiprocessing.Process):
         
         rows = tableHTML.xpath('//tbody/tr')
         
+        if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
+            headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note','Strava']
+        else:
+            headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
         data = []
         
         for row in rows:
@@ -168,7 +170,7 @@ class Worker(multiprocessing.Process):
         return data
     
     def getEvent(self, url, parkrunEvent):
-        url = url + "/results/weeklyresults/?runSeqNumber=" + str(parkrunEvent)
+        #url = url + "/results/weeklyresults/?runSeqNumber=" + str(parkrunEvent)
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
@@ -183,7 +185,7 @@ class Worker(multiprocessing.Process):
         return self.getEventTable(table)
     
     def getLatestEvent(self, url):
-        url = url + "/results/latestresults/"
+        #url = url + "/results/latestresults/"
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
@@ -206,7 +208,7 @@ class Worker(multiprocessing.Process):
     
         
     def getEventHistory(self, url):
-        url = url + "/results/eventhistory/"
+        #url = url + "/results/eventhistory/"
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error

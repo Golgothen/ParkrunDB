@@ -2,7 +2,7 @@ Parkrun_fe.accdb
 ParkrunList.csv
 parkrundl.log
 __pycache__/
-.project
-.pydevproject
 *.pyc
 
+/.pydevproject
+/.project
