@@ -102,13 +102,13 @@ class Connection():
         if c.rowcount == 0:
             try:
                 sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, AgeCategoryID, Gender"
-                values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', '"  + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) 
+                values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', "  + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "'" 
                 if athlete['Club'] is not None:
                     sql += ", ClubID"
-                    values += "', " + xstr(self.getClu(bathlete['Club']))
+                    values += ", " + xstr(self.getClub(athlete['Club']))
                 if athlete['StravaID'] is not None:
                     sql += ", StravaID"
-                    values += "', '" + xstr(athlete['StravaID'])
+                    values += ", '" + xstr(athlete['StravaID']) + "'"
                 sql += ")" + values + ")"
                 c = self.execute(sql)
                 c.commit()
