@@ -26,14 +26,14 @@ class ParkrunList():
 
     def __update(self, sql, add = True):
         c = Connection()
-        cursor = c.execute(sql)
-        for row in cursor.fetchall():
+        data = c.execute(sql)
+        for row in data:
             if add:
-                 if row[1] not in self.__parkruns:
-                     self.__parkruns[row[1]] = {'Name':row[0], 'url':row[1], 'lastEvent':row[5]}
+                 if row['URL'] not in self.__parkruns:
+                     self.__parkruns[row['URL']] = {'Name':row['Parkrun'], 'url':row['URL'], 'lastEvent':row['LastEventNumber']}
             else:
-                if row[1] in self.__parkruns:
-                    del self.__parkruns[row[1]]
+                if row['URL'] in self.__parkruns:
+                    del self.__parkruns[row['URL']]
             
     def __iter__(self):
         for k in self.__parkruns.keys():

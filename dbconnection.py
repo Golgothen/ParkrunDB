@@ -21,85 +21,95 @@ class Connection():
     
     def execute(self, sql):
         try:
-            return self.conn.execute(sql)
+            if sql[:6].upper() == "SELECT":
+                data = []
+                headings = []
+                c = self.conn.execute(sql)
+                if c.description is not None:
+                    for h in c.description:
+                        headings.append(h[0])
+                    for row in c.fetchall():
+                        d = {}
+                        for h, v in zip(headings, row):
+                            d[h]=v
+                        data.append(d)
+                    return data
+                else:
+                    return None
+            if sql[:6].upper() == "INSERT":
+                c = self.conn.execute(sql)
+                c = self.conn.execute("SELECT SCOPE_IDENTITY()")
+                if c.rowcount != 0:
+                    t = c.fetchone()[0]
+                    if t is not None:
+                        data = int(t)
+                    else:
+                        data=None
+                else:
+                    data=None
+                c.commit()
+                return data
+            if sql[:6].upper() in ["DELETE", "UPDATE"]:
+                c = self.conn.execute(sql)
+                c.commit()
+                return None
         except:
+            if sql[:6] in ['INSERT', 'DELETE', 'UPDATE']:
+                c.rollback()
             raise
         
     def getParkrunID(self, parkrunName):
         if self.cachedParkrun is None:
+            data = self.execute("SELECT ParkrunID, ParkrunName FROM Parkruns")
             self.cachedParkrun = {}
-            c = self.execute("SELECT ParkrunID, ParkrunName FROM Parkruns")
-            for row in c.fetchall():
-                self.cachedParkrun[row[1]] = row[0]
+            for row in data:
+                self.cachedParkrun[row['ParkrunName']] = row['ParkrunID'] 
         return self.cachedParkrun[parkrunName]
 
     def getAgeCatID(self, AgeCategory):
         if AgeCategory is None:
             return 1
         if self.cachedAgeCat is None:
+            data = self.execute("SELECT AgeCategoryID, AgeCategory FROM AgeCategories")
             self.cachedAgeCat = {}
-            c = self.execute("SELECT AgeCategoryID, AgeCategory FROM AgeCategories")
-            for row in c.fetchall():
-                self.cachedAgeCat[row[1]] = row[0]
+            for row in data:
+                self.cachedAgeCat[row['AgeCategory']] = row['AgeCategoryID']
         return self.cachedAgeCat[AgeCategory]
     
     def addParkrunEvent(self, parkrun):
-        sql = "INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['Name'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))"
-        c = self.execute(sql)
-        sql = "SELECT SCOPE_IDENTITY()"
-        c = self.execute(sql)
-        id = int(c.fetchone()[0])
-        c.commit()
-        return id
+        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['Name'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def replaceParkrunEvent(self, row):
-        sql = "SELECT EventID FROM getEventID('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")"
-        c = self.execute(sql)
-        if c.rowcount != 0:
-            id = int(c.fetchone()[0])
-            sql = "DELETE FROM Events WHERE EventID = " + xstr(id)
-            c = self.execute(sql)
-            c.commit()
-        sql = "INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['Name'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))"
-        c = self.execute(sql)
-        sql = "SELECT SCOPE_IDENTITY()"
-        c = self.execute(sql)
-        id = int(c.fetchone()[0])
-        c.commit()
-        return id
+        data = self.execute("SELECT EventID FROM getEventID('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")")
+        if len(data) != 0:
+            c = self.execute("DELETE FROM Events WHERE EventID = " + xstr(data[0]['EventID']))
+        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['Name'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def checkParkrunEvent(self, row):
-        sql = "SELECT Runners FROM getParkrunEventRunners('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")"
-        c = self.execute(sql)
-        if c.rowcount == 0:
-            r = 0
+        data = self.execute("SELECT Runners FROM getParkrunEventRunners('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")")
+        if len(data) == 0:
+            r =  0
         else:
-            r = c.fetchone()[0]
+            r = data[0]['Runners']
         return r == row['Runners']
 
     def getClub(self, club):
         if self.cachedClub is None:
+            data = self.execute("SELECT ClubID, ClubName from Clubs")
             self.cachedClub = {}
-            c = self.execute("SELECT ClubID, ClubName from Clubs")
-            for row in c.fetchall():
-                self.cachedClub[row[1]] = row[0]
+            for row in data:
+                self.cachedClub[row['ClubName']] = row['ClubID']
         if club is None: return None
         if club not in self.cachedClub:
-            sql = "INSERT INTO Clubs (ClubName) VALUES ('" + club + "')"
-            c = self.execute(sql)
-            sql = "SELECT SCOPE_IDENTITY()"
-            c = self.execute(sql)
-            id = int(c.fetchone()[0])
-            c.commit()
+            id = self.execute("INSERT INTO Clubs (ClubName) VALUES ('" + club + "')")
             self.cachedClub[club] = id
             return id
         else:
             return self.cachedClub[club]
             
     def addAthlete(self, athlete):
-        sql = "SELECT AthleteID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID'])
-        c = self.execute(sql)
-        if c.rowcount == 0:
+        data = self.execute("SELECT AthleteID, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID']))
+        if len(data) == 0:
             try:
                 sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, AgeCategoryID, Gender"
                 values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', "  + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "'" 
@@ -113,19 +123,16 @@ class Connection():
                 c = self.execute(sql)
                 c.commit()
             except pyodbc.Error as e:
-                c.rollback()
                 if e.args[0] == 23000:
                     # On rare occasions, an athlete can be entered by another thread/process at the same time, causing a key violation.
                     return
                 else:
                     raise
         else:
-            r = c.fetchall()
-            sql = "UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete['Age Cat'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID'])
-            c = self.execute(sql)
-            sql = "UPDATE Athletes SET ClubID = " + xstr(self.getClub(athlete['Club'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID'])
-            c = self.execute(sql)
-            c.commit()
+            if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete['Age Cat']):
+                self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete['Age Cat'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID']))
+            if data[0]['ClubID'] != self.getClub(athlete['Club']):
+                self.execute("UPDATE Athletes SET ClubID = " + xstr(self.getClub(athlete['Club'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID']))
             
     def addParkrunEventPosition(self, position):
         self.addAthlete(position)
@@ -145,14 +152,10 @@ class Connection():
             sql += ", Comment" 
             values +=  ", '" + xstr(position['Note']) + "'"
         sql += ")" + values + ")"
-        
-        c = self.execute(sql)
-        c.commit()
+        self.execute(sql)
     
     def updateParkrunURL(self, parkrun, verified, valid):
-        sql = "UPDATE Parkruns SET URLVerified = " + str(int(verified)) + ", URLValid = " + str(int(valid)) + " WHERE ParkrunName = '" + parkrun + "'"
-        c = self.execute(sql)
-        c.commit()
+        self.execute("UPDATE Parkruns SET URLVerified = " + str(int(verified)) + ", URLValid = " + str(int(valid)) + " WHERE ParkrunName = '" + parkrun + "'")
         
     def close(self):
         self.conn.close()
