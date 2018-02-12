@@ -120,8 +120,7 @@ class Connection():
                     sql += ", StravaID"
                     values += ", '" + xstr(athlete['StravaID']) + "'"
                 sql += ")" + values + ")"
-                c = self.execute(sql)
-                c.commit()
+                self.execute(sql)
             except pyodbc.Error as e:
                 if e.args[0] == 23000:
                     # On rare occasions, an athlete can be entered by another thread/process at the same time, causing a key violation.
