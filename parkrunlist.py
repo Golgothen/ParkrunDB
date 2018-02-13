@@ -29,8 +29,13 @@ class ParkrunList():
         data = c.execute(sql)
         for row in data:
             if add:
-                 if row['URL'] not in self.__parkruns:
-                     self.__parkruns[row['URL']] = {'Name':row['Parkrun'], 'url':row['URL'], 'lastEvent':row['LastEventNumber']}
+                 if row['Parkrun'] not in self.__parkruns:
+                     self.__parkruns[row['Parkrun']] = {'Name'             :row['Parkrun'],
+                                                        'url'              :row['URL'],
+                                                        'lastEvent'        :row['LastEventNumber'],
+                                                        'EventHistoryURL'  :row['EventHistoryURL'],
+                                                        'EventNumberURL'   :row['EventNumberURL'],
+                                                        'LatestResultsURL' :row['LatestResultsURL']}
             else:
                 if row['URL'] in self.__parkruns:
                     del self.__parkruns[row['URL']]

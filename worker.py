@@ -32,9 +32,7 @@ class Worker(multiprocessing.Process):
         c = Connection()
         self.msgQ.put(Message('Process',self.id, 'Running'))
         while True:
-            #self.l.acquire()
             parkrun = self.inQ.get()
-            #self.l.release()
             if parkrun is None:
                 self.msgQ.put(Message('Process', self.id, 'Exiting'))
                 break
@@ -49,7 +47,7 @@ class Worker(multiprocessing.Process):
             
             if self.mode == Mode.NEWEVENTS:
                 self.msgQ.put(Message('Process', self.id, 'Checking for new results for ' + parkrun['Name'] ))
-                parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'] + parkrun['LatestResult'])
+                parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'] + parkrun['LatestResultsURL'])
                 if data is not None:
                     parkrun['Runners'] = len(data)
                     # Add the event if it's a new event
@@ -63,7 +61,7 @@ class Worker(multiprocessing.Process):
                             c.addParkrunEventPosition(row)
                 
             if self.mode == Mode.NORMAL:
-                data = self.getEventHistory(parkrun['url'] + parkrun['EventHistory'])
+                data = self.getEventHistory(parkrun['url'] + parkrun['EventHistoryURL'])
                 if data is not None:
                     for row in data:
                         row['Name'] = parkrun['Name']
@@ -72,9 +70,10 @@ class Worker(multiprocessing.Process):
                         # Check the event has the correct number of runners
                         if not c.checkParkrunEvent(row):
                             #if not, delete the old event record and re-import the data
-                            self.msgQ.put(Message('Process', self.id, 'Replacing ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                            self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
-                            eData = self.getEvent(parkrun['url'] + parkrun['EventNumber'], row['EventNumber'])
+                            #print(parkrun)
+                            eData = self.getEvent(parkrun['url'] + parkrun['EventNumberURL'], row['EventNumber'])
                             if eData is not None:
                                 for eRow in eData:
                                     eRow['EventID'] = eventID
@@ -171,7 +170,7 @@ class Worker(multiprocessing.Process):
     
     def getEvent(self, url, parkrunEvent):
         #url = url + "/results/weeklyresults/?runSeqNumber=" + str(parkrunEvent)
-        html = self.getURL(url)
+        html = self.getURL(url + str(parkrunEvent))
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
             self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
