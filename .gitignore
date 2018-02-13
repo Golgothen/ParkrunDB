@@ -4,5 +4,9 @@ parkrundl.log
 __pycache__/
 *.pyc
 
+<<<<<<< HEAD
 /.pydevproject
 /.project
+=======
+/test.bat
+>>>>>>> refs/remotes/origin/master
