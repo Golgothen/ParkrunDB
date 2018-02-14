@@ -66,15 +66,36 @@ class Connection():
                 self.cachedParkrun[row['ParkrunName']] = row['ParkrunID'] 
         return self.cachedParkrun[parkrunName]
 
-    def getAgeCatID(self, AgeCategory):
-        if AgeCategory is None:
+    def getAgeCatID(self, athlete):
+        if athlete['Age Cat'] is None:
             return 1
         if self.cachedAgeCat is None:
             data = self.execute("SELECT AgeCategoryID, AgeCategory FROM AgeCategories")
             self.cachedAgeCat = {}
             for row in data:
                 self.cachedAgeCat[row['AgeCategory']] = row['AgeCategoryID']
-        return self.cachedAgeCat[AgeCategory]
+        if athlete['Age Cat'] in self.cachedAgeCat:
+            return self.cachedAgeCat[athlete['Age Cat']]
+        else:
+            ageGroup = athlete['Age Cat'][2:]
+            if ageGroup == '---':
+                ageCat = 'S'
+            elif ageGroup == 'C':
+                ageCat = ''
+                ageGroup = 'WC'
+            else:
+                startage = int(ageGroup.split('-')[0])
+                if startage in [10, 11, 15]:
+                    ageCat = 'J'
+                if startage in [18, 20, 25, 30]:
+                    ageCat = 'S'
+                if startage > 30:
+                    ageCat = 'V'
+            if athlete['Gender'] == 'M':
+                ageCat += 'M' + ageGroup
+            else:
+                ageCat += 'W' + ageGroup
+            return self.cachedAgeCat[ageCat]
     
     def addParkrunEvent(self, parkrun):
         return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['Name'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
@@ -108,11 +129,11 @@ class Connection():
             return self.cachedClub[club]
             
     def addAthlete(self, athlete):
-        data = self.execute("SELECT AthleteID, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID']))
+        data = self.execute("SELECT AthleteID, FirstName, LastName, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID']))
         if len(data) == 0:
             try:
                 sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, AgeCategoryID, Gender"
-                values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', "  + xstr(self.getAgeCatID(athlete['Age Cat'])) + ", '" + xstr(athlete['Gender']) + "'" 
+                values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', "  + xstr(self.getAgeCatID(athlete)) + ", '" + xstr(athlete['Gender']) + "'" 
                 if athlete['Club'] is not None:
                     sql += ", ClubID"
                     values += ", " + xstr(self.getClub(athlete['Club']))
@@ -128,10 +149,15 @@ class Connection():
                 else:
                     raise
         else:
-            if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete['Age Cat']):
-                self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete['Age Cat'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID']))
-            if data[0]['ClubID'] != self.getClub(athlete['Club']):
-                self.execute("UPDATE Athletes SET ClubID = " + xstr(self.getClub(athlete['Club'])) + " WHERE AthleteID = " + xstr(athlete['AthleteID']))
+            if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete) or \
+               data[0]['ClubID'] != self.getClub(athlete['Club']) or \
+               data[0]['FirstName'] != athlete['FirstName'] or \
+               data[0]['LastName'] != athlete['LastName']:
+                self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete)) + \
+                             ", ClubID = " + xstr(self.getClub(athlete['Club'])) + \
+                             ", FirstName = " + athlete['FirstName'] + \
+                             ", LastName = " + athlete['LastName'] + \
+                             " WHERE AthleteID = " + xstr(athlete['AthleteID']))
             
     def addParkrunEventPosition(self, position):
         self.addAthlete(position)
@@ -143,7 +169,7 @@ class Connection():
             values += ", CAST('" + xstr(position['Time']) + "' as time(0))"
         if position['Age Cat'] is not  None:
             sql += ", AgeCategoryID" 
-            values += ", " + xstr(self.getAgeCatID(position['Age Cat']))
+            values += ", " + xstr(self.getAgeCatID(position))
         if position['Age Grade'] is not  None:
             sql += ", AgeGrade" 
             values += ", " + xstr(position['Age Grade'])

@@ -127,8 +127,11 @@ class Worker(multiprocessing.Process):
                 if h == 'parkrunner':
                     if len(v.getchildren())>0:
                         d['FirstName']=v.getchildren()[0].text.split()[0].replace("'","''")
-                        if len(v.getchildren()[0].text.split())>1:
-                            d['LastName']=v.getchildren()[0].text.split()[1].capitalize().replace("'","''")
+                        lastName = ''
+                        for i in range(1, len(v.getchildren()[0].text.split())):
+                            lastName+=v.getchildren()[0].text.split()[i].capitalize().replace("'","''") + ' '
+                        if lastName != '':
+                            d['LastName'] = lastName.strip()
                         else:
                             d['LastName'] = None
                         d['AthleteID']=int(v.getchildren()[0].get('href').split('=')[1])
@@ -166,6 +169,10 @@ class Worker(multiprocessing.Process):
                     else:
                         d[h]=None
             data.append(d)
+        if 'Pos' not in data[0].keys():
+            data = sorted(data, key=lambda k: '0:00:00' if k['Time'] is None else k['Time'])
+            for i in range(len(data)):
+                data[i]['Pos'] = i + 1
         return data
     
     def getEvent(self, url, parkrunEvent):
