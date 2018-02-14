@@ -37,7 +37,7 @@ def paintScreen(procs, qsize):
 def updateScreen(procs, qsize):
     width, height = get_terminal_size()
     if width != termWidth or height != termHeight:
-        paintScreen(procs)
+        paintScreen(procs, qsize)
     else:
         for p in procs:
             printxy(p.id+2, 30, '{:.{w}}'.format(p.message + (' ' * (width - 29)), w = width - 29))
