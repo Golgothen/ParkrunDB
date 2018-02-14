@@ -20,6 +20,7 @@ class Connection():
         self.cachedClub = None
     
     def execute(self, sql):
+        c = None
         try:
             if sql[:6].upper() == "SELECT":
                 data = []
@@ -55,7 +56,8 @@ class Connection():
                 return None
         except:
             if sql[:6] in ['INSERT', 'DELETE', 'UPDATE']:
-                c.rollback()
+                if c is not None:
+                    c.rollback()
             raise
         
     def getParkrunID(self, parkrunName):
@@ -129,6 +131,7 @@ class Connection():
             return self.cachedClub[club]
             
     def addAthlete(self, athlete):
+        #print(athlete)
         data = self.execute("SELECT AthleteID, FirstName, LastName, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID']))
         if len(data) == 0:
             try:
@@ -149,15 +152,16 @@ class Connection():
                 else:
                     raise
         else:
-            if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete) or \
-               data[0]['ClubID'] != self.getClub(athlete['Club']) or \
-               data[0]['FirstName'] != athlete['FirstName'] or \
-               data[0]['LastName'] != athlete['LastName']:
-                self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete)) + \
-                             ", ClubID = " + xstr(self.getClub(athlete['Club'])) + \
-                             ", FirstName = " + athlete['FirstName'] + \
-                             ", LastName = " + athlete['LastName'] + \
-                             " WHERE AthleteID = " + xstr(athlete['AthleteID']))
+            if athlete['AthleteID'] != 0:
+                if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete) or \
+                   data[0]['ClubID'] != self.getClub(athlete['Club']) or \
+                   data[0]['FirstName'] != athlete['FirstName'] or \
+                   data[0]['LastName'] != athlete['LastName']:
+                    self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete)) + \
+                                 ", ClubID = " + xstr(self.getClub(athlete['Club'])) + \
+                                 ", FirstName = '" + athlete['FirstName'] + "'" + \
+                                 ", LastName = '" + athlete['LastName'] + "'" + \
+                                 " WHERE AthleteID = " + str(athlete['AthleteID']))
             
     def addParkrunEventPosition(self, position):
         self.addAthlete(position)
