@@ -72,7 +72,6 @@ class Worker(multiprocessing.Process):
                             #if not, delete the old event record and re-import the data
                             self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
-                            #print(parkrun)
                             eData = self.getEvent(parkrun['url'] + parkrun['EventNumberURL'], row['EventNumber'])
                             if eData is not None:
                                 for eRow in eData:
@@ -176,7 +175,6 @@ class Worker(multiprocessing.Process):
         return data
     
     def getEvent(self, url, parkrunEvent):
-        #url = url + "/results/weeklyresults/?runSeqNumber=" + str(parkrunEvent)
         html = self.getURL(url + str(parkrunEvent))
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
@@ -191,7 +189,6 @@ class Worker(multiprocessing.Process):
         return self.getEventTable(table)
     
     def getLatestEvent(self, url):
-        #url = url + "/results/latestresults/"
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
@@ -214,7 +211,6 @@ class Worker(multiprocessing.Process):
     
         
     def getEventHistory(self, url):
-        #url = url + "/results/eventhistory/"
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
