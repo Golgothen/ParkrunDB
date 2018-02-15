@@ -3,13 +3,6 @@ ParkrunList.csv
 parkrundl.log
 __pycache__/
 *.pyc
-
-<<<<<<< HEAD
 /.pydevproject
 /.project
-=======
-/test.bat
->>>>>>> refs/remotes/origin/master
-/ParkrunDB.pyproj
-/.vs/ParkrunDB/v14/.suo
-/ParkrunDB.sln
+/RUN-20180216.log
