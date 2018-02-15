@@ -11,6 +11,8 @@ from enum import Enum
 
 xstr = lambda s: '' if s is None else str(s)
 
+# Test new repo sync in VisualStudio
+
 class Mode(Enum):
     NORMAL = 0
     CHECKURLS = 1
