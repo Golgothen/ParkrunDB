@@ -1,6 +1,7 @@
+from mplogger import *
 from worker import *
 from terminal_size import *
-import argparse
+import argparse, logging, logging.config
 from sys import stdout
 from message import Message
 from parkrunlist import ParkrunList
@@ -9,8 +10,8 @@ termWidth = 0
 termHeight = 0
 
 class ProcInfo():
-    def __init__(self, id, pid, message = ''):
-        self.id = id
+    def __init__(self, proc_id, pid, message = ''):
+        self.id = proc_id
         self.pid = pid
         self.message = message
         self.error = ''
@@ -57,10 +58,21 @@ if __name__ == '__main__':
     parser.add_argument('--mode', nargs = 1, default = ['Normal'], help = 'Valid modes are Normal, CheckURLs or NewEvents')
     args = parser.parse_args()
 
+    loggingQueue = multiprocessing.Queue()
+
+    listener = LogListener(loggingQueue)
+    listener.start()
+    
+    config = sender_config
+    config['handlers']['queue']['queue'] = loggingQueue
+    logging.config.dictConfig(config)
+    logger = logging.getLogger('application')
+    
     mode = Mode.default()
     
+    logger.debug(args)
     #First, build a list of events that need to be checked.
-    l = ParkrunList()
+    l = ParkrunList(config)
     if args.country is not None: l.countries(args.country, True)
     if args.region is not None: l.regions(args.region, True)
     if args.event is not None: l.events(args.event, True)
@@ -91,7 +103,7 @@ if __name__ == '__main__':
     p = []
     procs = []
     for i in range(processes):
-        p.append(Worker(workQueue, r, i, mode))
+        p.append(Worker(workQueue, r, i, mode, config))
         p[i].start()
         procs.append(ProcInfo(i, p[i].pid))
     
@@ -120,6 +132,8 @@ if __name__ == '__main__':
         x.join()
         
     updateScreen(procs, workQueue.qsize())
+    listener.stop()
+    
 
 
 

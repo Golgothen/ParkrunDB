@@ -1,8 +1,7 @@
 import multiprocessing
 from urllib.request import urlopen, Request #, localhost
 from urllib.error import HTTPError
-import os
-import lxml.html
+import lxml.html, logging, logging.config #, os
 from time import sleep
 from dbconnection import Connection
 from datetime import datetime
@@ -23,21 +22,28 @@ class Mode(Enum):
         return cls.NORMAL
 
 class Worker(multiprocessing.Process):
-    def __init__(self, q, m, i, mode):
+    def __init__(self, q, m, i, mode, config):
         super(Worker, self).__init__()
         self.inQ = q  #input Queue
         self.msgQ = m  #message queue
         self.id = i
         self.mode = mode
+        self.config = config
+        #self.loggingQueue = loggingQueue
         
     def run(self):
-        c = Connection()
+        c = Connection(self.config)
+        logging.config.dictConfig(self.config)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info('Process {} Running'.format(self.id))
         self.msgQ.put(Message('Process',self.id, 'Running'))
         while True:
             parkrun = self.inQ.get()
             if parkrun is None:
+                self.logger.info('Process {} Exiting'.format(self.id))
                 self.msgQ.put(Message('Process', self.id, 'Exiting'))
                 break
+            self.logger.debug('Process {} got record {}'.format(self.id, parkrun))
             if parkrun['lastEvent'] is None: parkrun['lastEvent'] = 0
             if self.mode == Mode.CHECKURLS:
                 if self.getURL(parkrun['url']) is not None:
@@ -48,6 +54,7 @@ class Worker(multiprocessing.Process):
                     self.msgQ.put(Message('Error', self.id, 'Could not verify ' + parkrun['Name'] + ' as valid'))
             
             if self.mode == Mode.NEWEVENTS:
+                self.logger.info('Process {} checking for new results for {}'.format(self.id, parkrun['Name']))
                 self.msgQ.put(Message('Process', self.id, 'Checking for new results for ' + parkrun['Name'] ))
                 parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'] + parkrun['LatestResultsURL'])
                 if data is not None:
@@ -55,6 +62,7 @@ class Worker(multiprocessing.Process):
                     # Add the event if it's a new event
                     # Check the event has the correct number of runners
                     if not c.checkParkrunEvent(parkrun):
+                        self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['Name'], parkrun['EventNumber']))
                         #if not, delete the old event record and re-import the data
                         self.msgQ.put(Message('Process', self.id, 'Updating ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
                         eventID = c.replaceParkrunEvent(parkrun)
@@ -72,6 +80,7 @@ class Worker(multiprocessing.Process):
                         # Check the event has the correct number of runners
                         if not c.checkParkrunEvent(row):
                             #if not, delete the old event record and re-import the data
+                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['Name'], parkrun['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
                             eData = self.getEvent(parkrun['url'] + parkrun['EventNumberURL'], row['EventNumber'])
@@ -79,21 +88,26 @@ class Worker(multiprocessing.Process):
                                 for eRow in eData:
                                     eRow['EventID'] = eventID
                                     c.addParkrunEventPosition(eRow)
+                else:
+                    self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
         c.close()
         
     def getURL(self, url):
         completed = False
         while not completed:
             try:
+                self.logger.debug('Hitting {}'.format(url))
                 f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'}))
                 completed = True
             except HTTPError as e:
+                self.logger.warning('Got HTTP Error {}'.format(e.code))
                 if e.code == 404:
                     self.msgQ.put(Message('Error',self.id, 'Bad URL ' + url))
                     return None
                 self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
                 sleep(1)
             except:
+                self.logger.warning('Unexpected network error')
                 self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
                 return None
         return f.read().decode('utf-8')
@@ -177,12 +191,15 @@ class Worker(multiprocessing.Process):
         return data
     
     def getEvent(self, url, parkrunEvent):
+        self.logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
         html = self.getURL(url + str(parkrunEvent))
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
+            self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
             return None
         if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+            self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
             return None
         html = '<table' + html.split('<table')[1]
@@ -191,12 +208,15 @@ class Worker(multiprocessing.Process):
         return self.getEventTable(table)
     
     def getLatestEvent(self, url):
+        self.logger.debug('Hitting {}'.format(url))
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
+            self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
             return None
         if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+            self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
             return None
         eventHTML = html.split('<h2>')[1]
@@ -213,12 +233,15 @@ class Worker(multiprocessing.Process):
     
         
     def getEventHistory(self, url):
+        self.logger.debug('Hitting {}'.format(url))
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
+            self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible 404 error gettint event history. Check url ' + url))
             return None
         if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:    
+            self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'URL error in event history. Check ' + url))
             return None
         html = '<table' + html.split('<table')[1]

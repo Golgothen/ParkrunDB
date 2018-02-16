@@ -1,27 +1,28 @@
-from multiprocessing import Process, Event, Queue #, current_process
-import logging, logging.handlers, logging.config
+from multiprocessing import Process, Event, Queue
+import logging.handlers, logging.config
 from datetime import datetime
 
-shared_logging_queue = Queue()
-
-worker_config = {
+sender_config = {
     'version': 1,
     'disable_existing_loggers': True,
     'handlers': {
         'queue': {
             'class': 'logging.handlers.QueueHandler',
-            'queue': shared_logging_queue,
+            'queue': Queue,
         },
     },
     'loggers': {
-        'dbconnection': {
+        'application': {
             'level':       'DEBUG',
         },
-        'parkrunlist': {
-            'level':       'WARNING',
-        },
         'worker': {
-            'level':       'WARNING',
+            'level':       'INFO',
+        },
+        'parkrunlist': {
+            'level':       'INFO',
+        },
+        'dbconnection': {
+            'level':       'DEBUG',
         },
     },
     'root': {
@@ -37,7 +38,7 @@ listener_config = {
     'formatters': {
         'detailed': {
             'class':       'logging.Formatter',
-            'format':      '%(asctime)-16s:%(name)-21s:%(levelname)-8s[%(module)-13s.%(funcName)-20s %(lineno)-5s] %(message)s'
+            'format':      '%(asctime)-16s:%(name)-21s:%(processName)-15s:%(levelname)-8s[%(module)-13s.%(funcName)-20s %(lineno)-5s] %(message)s'
             },
         'brief': {
             'class':       'logging.Formatter',
@@ -53,7 +54,7 @@ listener_config = {
         'file': {
             'class':       'logging.FileHandler',
             'filename':    (datetime.now().strftime('RUN-%Y%m%d')+'.log'),
-            'mode':        'w',
+            'mode':        'a',
             'formatter':   'detailed',
         },
         #'filerotate': {
@@ -73,34 +74,28 @@ listener_config = {
 
 class MyHandler(object):
     def handle(self, record):
-        print(record.name)
-        #print(record)
         logger = logging.getLogger(record.name)
-        #record.processName = '%s (for %s)' % (current_process().name, record.processName)
         logger.handle(record)
 
 class LogListener(Process):
-    def __init__(self):
+    def __init__(self, logQueue):
         super(LogListener, self).__init__()
         self.__stop_event = Event()
         self.name = 'listener'
+        self.logQueue = logQueue
 
     def run(self):
         logging.config.dictConfig(listener_config)
-        logger = logging.getLogger('listener')
-        logger.info('Logging system initialised')
-        listener = logging.handlers.QueueListener(shared_logging_queue, MyHandler())
+        listener = logging.handlers.QueueListener(self.logQueue, MyHandler())
         listener.start()
-        logger.info('Logging system running')
         while True:
             try:
                 self.__stop_event.wait()
                 listener.stop()
-                logger.info('Logging system stopped')
+                break
             except (KeyboardInterrupt, SystemExit):
-                continue
-                #listener.stop()
-        logger.info('Logging system stopped')
+                listener.stop()
+                break
 
     def stop(self):
         self.__stop_event.set()

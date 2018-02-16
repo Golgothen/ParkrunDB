@@ -1,9 +1,9 @@
-import pyodbc
+import pyodbc, logging, logging.config
 
 xstr = lambda s: 'NULL' if s is None else str(s)
 
 class Connection():
-    def __init__(self):
+    def __init__(self, config):
 
         server = 'localhost'
         database = 'Parkrun'
@@ -18,8 +18,13 @@ class Connection():
         self.cachedAgeCat = None
         #self.cachedAthlete = None
         self.cachedClub = None
+        self.config = config
+        logging.config.dictConfig(config)
+        self.logger = logging.getLogger(__name__)
+
     
     def execute(self, sql):
+        self.logger.debug(sql)
         c = None
         try:
             if sql[:6].upper() == "SELECT":
@@ -105,7 +110,7 @@ class Connection():
     def replaceParkrunEvent(self, row):
         data = self.execute("SELECT EventID FROM getEventID('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")")
         if len(data) != 0:
-            c = self.execute("DELETE FROM Events WHERE EventID = " + xstr(data[0]['EventID']))
+            self.execute("DELETE FROM Events WHERE EventID = " + xstr(data[0]['EventID']))
         return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['Name'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def checkParkrunEvent(self, row):
@@ -124,9 +129,9 @@ class Connection():
                 self.cachedClub[row['ClubName']] = row['ClubID']
         if club is None: return None
         if club not in self.cachedClub:
-            id = self.execute("INSERT INTO Clubs (ClubName) VALUES ('" + club + "')")
-            self.cachedClub[club] = id
-            return id
+            c_id = self.execute("INSERT INTO Clubs (ClubName) VALUES ('" + club + "')")
+            self.cachedClub[club] = c_id
+            return c_id
         else:
             return self.cachedClub[club]
             
