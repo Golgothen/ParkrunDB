@@ -60,8 +60,10 @@ class Connection():
                 c.commit()
                 return None
         except:
+            self.logger.error('Error occured executing statement',exec_info = True, stack_info = True)
             if sql[:6] in ['INSERT', 'DELETE', 'UPDATE']:
                 if c is not None:
+                    self.logger.error('Rolling back previous statement')
                     c.rollback()
             raise
         
@@ -70,7 +72,8 @@ class Connection():
             data = self.execute("SELECT ParkrunID, ParkrunName FROM Parkruns")
             self.cachedParkrun = {}
             for row in data:
-                self.cachedParkrun[row['ParkrunName']] = row['ParkrunID'] 
+                self.cachedParkrun[row['ParkrunName']] = row['ParkrunID']
+            self.logger.debug('Added {} records to Parkrun cache'.format(len(self.cachedParkrun))) 
         return self.cachedParkrun[parkrunName]
 
     def getAgeCatID(self, athlete):
@@ -81,6 +84,7 @@ class Connection():
             self.cachedAgeCat = {}
             for row in data:
                 self.cachedAgeCat[row['AgeCategory']] = row['AgeCategoryID']
+            self.logger.debug('Added {} records to Age Category cache'.format(len(self.cachedAgeCat))) 
         if athlete['Age Cat'] in self.cachedAgeCat:
             return self.cachedAgeCat[athlete['Age Cat']]
         else:
@@ -102,6 +106,7 @@ class Connection():
                 ageCat += 'M' + ageGroup
             else:
                 ageCat += 'W' + ageGroup
+            self.logger.debug('Improvised AgeCat lookup.  Came up with {} from {}'.format(ageCat, athlete['Age Cat']))
             return self.cachedAgeCat[ageCat]
     
     def addParkrunEvent(self, parkrun):
@@ -127,6 +132,7 @@ class Connection():
             self.cachedClub = {}
             for row in data:
                 self.cachedClub[row['ClubName']] = row['ClubID']
+            self.logger.debug('Added {} records to Club cache'.format(len(self.cachedClub))) 
         if club is None: return None
         if club not in self.cachedClub:
             c_id = self.execute("INSERT INTO Clubs (ClubName) VALUES ('" + club + "')")
@@ -136,7 +142,6 @@ class Connection():
             return self.cachedClub[club]
             
     def addAthlete(self, athlete):
-        #print(athlete)
         data = self.execute("SELECT AthleteID, FirstName, LastName, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID']))
         if len(data) == 0:
             try:
@@ -155,6 +160,7 @@ class Connection():
                     # On rare occasions, an athlete can be entered by another thread/process at the same time, causing a key violation.
                     return
                 else:
+                    self.logger.error('Error adding athlete {}'.format(athlete), exec_info = True, stack_info = True)
                     raise
         else:
             if athlete['AthleteID'] != 0:

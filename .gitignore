@@ -5,4 +5,4 @@ __pycache__/
 *.pyc
 /.pydevproject
 /.project
-/RUN-20180216.log
+*.log
