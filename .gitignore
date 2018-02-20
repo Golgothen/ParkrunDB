@@ -1,8 +1,8 @@
 Parkrun_fe.accdb
 ParkrunList.csv
-parkrundl.log
 __pycache__/
 *.pyc
+*.log
 /.pydevproject
 /.project
-/RUN-20180216.log
+
