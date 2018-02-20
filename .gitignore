@@ -5,4 +5,8 @@ __pycache__/
 *.log
 /.pydevproject
 /.project
+<<<<<<< HEAD
 
+=======
+*.log
+>>>>>>> branch 'MultirocessLogger' of https://github.com/Golgothen/ParkrunDB.git

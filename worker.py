@@ -80,7 +80,7 @@ class Worker(multiprocessing.Process):
                         # Check the event has the correct number of runners
                         if not c.checkParkrunEvent(row):
                             #if not, delete the old event record and re-import the data
-                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['Name'], parkrun['EventNumber']))
+                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['Name'], row['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
                             eData = self.getEvent(parkrun['url'] + parkrun['EventNumberURL'], row['EventNumber'])
@@ -117,8 +117,9 @@ class Worker(multiprocessing.Process):
         
         rows = tableHTML.xpath('//tbody/tr')
         
-        if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
-            headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note','Strava']
+        if len(rows) > 0:
+            if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
+                headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note','Strava']
         else:
             headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
         data = []
@@ -184,10 +185,11 @@ class Worker(multiprocessing.Process):
                     else:
                         d[h]=None
             data.append(d)
-        if 'Pos' not in data[0].keys():
-            data = sorted(data, key=lambda k: '0:00:00' if k['Time'] is None else k['Time'])
-            for i in range(len(data)):
-                data[i]['Pos'] = i + 1
+        if len(data) > 0:
+            if 'Pos' not in data[0].keys():
+                data = sorted(data, key=lambda k: '0:00:00' if k['Time'] is None else k['Time'])
+                for i in range(len(data)):
+                    data[i]['Pos'] = i + 1
         return data
     
     def getEvent(self, url, parkrunEvent):
