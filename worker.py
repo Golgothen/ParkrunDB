@@ -107,10 +107,15 @@ class Worker(multiprocessing.Process):
                 self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
                 sleep(1)
             except:
-                self.logger.warning('Unexpected network error')
+                self.logger.warning('Unexpected network error. URL: ' + url)
                 self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
                 return None
-        return f.read().decode('utf-8')
+        try:
+            temp = f.read().decode('utf-8')
+        except:
+            self.logger.error('Error decoding page {}'.format(url))
+            return None
+        return temp 
     
     def getEventTable(self, tableHTML):
         headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
@@ -239,7 +244,7 @@ class Worker(multiprocessing.Process):
         html = self.getURL(url)
         #Test if we got a valid response'
         if html is None:  #most likely a 404 error
-            self.logger.warning('Error retrieving event')
+            self.logger.warning('Error retrieving event. URL: ' + url)
             self.msgQ.put(Message('Error', self.id, 'Possible 404 error gettint event history. Check url ' + url))
             return None
         if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:    
