@@ -110,11 +110,8 @@ class Worker(multiprocessing.Process):
                 self.logger.warning('Unexpected network error. URL: ' + url)
                 self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
                 return None
-        try:
-            temp = f.read().decode('utf-8')
-        except:
-            self.logger.error('Error decoding page {}'.format(url))
-            return None
+        temp = f.read().decode('utf-8', errors='ignore')
+        self.logger.debug('URL returned string of length {}'.format(len(temp)))
         return temp 
     
     def getEventTable(self, tableHTML):
