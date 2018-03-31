@@ -49,8 +49,10 @@ class Connection():
                     t = c.fetchone()[0]
                     if t is not None:
                         data = int(t)
+                        self.logger.debug('INSERT returned SCOPE_IDENTITY() {}'.format(int(t)))
                     else:
                         data=None
+                        self.logger.debug('INSERT returned no SCOPE_IDENTITY()')
                 else:
                     data=None
                 c.commit()

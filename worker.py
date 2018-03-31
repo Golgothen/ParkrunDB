@@ -22,13 +22,14 @@ class Mode(Enum):
         return cls.NORMAL
 
 class Worker(multiprocessing.Process):
-    def __init__(self, q, m, i, mode, config):
+    def __init__(self, q, m, i, mode, config, delay):
         super(Worker, self).__init__()
         self.inQ = q  #input Queue
         self.msgQ = m  #message queue
         self.id = i
         self.mode = mode
         self.config = config
+        self.delay = delay
         #self.loggingQueue = loggingQueue
         
     def run(self):
@@ -58,6 +59,7 @@ class Worker(multiprocessing.Process):
                 self.msgQ.put(Message('Process', self.id, 'Checking for new results for ' + parkrun['Name'] ))
                 parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'] + parkrun['LatestResultsURL'])
                 if data is not None:
+                    self.logger.debug('Event {} got {} events in history'.format(parkrun['url'], len(data)))
                     parkrun['Runners'] = len(data)
                     # Add the event if it's a new event
                     # Check the event has the correct number of runners
@@ -66,6 +68,7 @@ class Worker(multiprocessing.Process):
                         #if not, delete the old event record and re-import the data
                         self.msgQ.put(Message('Process', self.id, 'Updating ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
                         eventID = c.replaceParkrunEvent(parkrun)
+                        self.logger.debug('getLastEvent found {} runners'.format(len(data)))
                         for row in data:
                             row['EventID'] = eventID
                             c.addParkrunEventPosition(row)
@@ -73,10 +76,12 @@ class Worker(multiprocessing.Process):
             if self.mode == Mode.NORMAL:
                 data = self.getEventHistory(parkrun['url'] + parkrun['EventHistoryURL'])
                 if data is not None:
+                    self.logger.debug('Event {} got {} events in history'.format(parkrun['url'], len(data)))
                     for row in data:
                         row['Name'] = parkrun['Name']
                         # Add the event if it's a new event
                         self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                        self.logger.debug('Process {} Checking {} event {}'.format(self.id, row['Name'], xstr(row['EventNumber'])))
                         # Check the event has the correct number of runners
                         if not c.checkParkrunEvent(row):
                             #if not, delete the old event record and re-import the data
@@ -85,11 +90,16 @@ class Worker(multiprocessing.Process):
                             eventID = c.replaceParkrunEvent(row)
                             eData = self.getEvent(parkrun['url'] + parkrun['EventNumberURL'], row['EventNumber'])
                             if eData is not None:
+                                self.logger.debug('getEvent found {} runners'.format(len(eData)))
                                 for eRow in eData:
                                     eRow['EventID'] = eventID
                                     c.addParkrunEventPosition(eRow)
+                            else:
+                                self.logger.debug('getEvent found no runners')
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
+            self.logger.debug('Sleeping for {} seconds'.format(self.delay))
+            sleep(self.delay)
         c.close()
         
     def getURL(self, url):

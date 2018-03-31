@@ -56,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--exclude_region', nargs = '+',  help = 'Specify region/s to exclude from import. Surround the name with double quotes if it contains a space. Seperate multiple regions with spaces.')
     parser.add_argument('--exclude_event', nargs = '+',  help = 'Specify event/s to exclude from import. Surround the name with double quotes if it contains a space. Seperate multiple events with spaces.')
     parser.add_argument('--mode', nargs = 1, default = ['Normal'], help = 'Valid modes are Normal, CheckURLs or NewEvents')
+    parser.add_argument('--delay', type = int, default = 0, help = 'Wait n seconds before processing the next event')
     args = parser.parse_args()
 
     loggingQueue = multiprocessing.Queue()
@@ -103,7 +104,7 @@ if __name__ == '__main__':
     p = []
     procs = []
     for i in range(processes):
-        p.append(Worker(workQueue, r, i, mode, config))
+        p.append(Worker(workQueue, r, i, mode, config, args.delay))
         p[i].start()
         procs.append(ProcInfo(i, p[i].pid))
     

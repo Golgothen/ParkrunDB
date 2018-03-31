@@ -16,13 +16,13 @@ sender_config = {
             'level':       'WARNING',
         },
         'worker': {
-            'level':       'WARNING',
+            'level':       'DEBUG',
         },
         'parkrunlist': {
-            'level':       'WARNING',
+            'level':       'DEBUG',
         },
         'dbconnection': {
-            'level':       'WARNING',
+            'level':       'DEBUG',
         },
     },
     'root': {
