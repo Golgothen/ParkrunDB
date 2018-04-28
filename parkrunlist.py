@@ -1,14 +1,16 @@
 #from mplogger import *
 from dbconnection import Connection
+from worker import Mode
 import logging, logging.config
 
 class ParkrunList():
-    def __init__(self, config):
+    def __init__(self, config, mode):
         self.__parkruns = {}
-        self.__index = 0
+        #self.__index = 0
         self.config = config
         logging.config.dictConfig(config)
         self.logger = logging.getLogger(__name__)
+        self.mode = mode
         
     def countries(self, countries, add):
         for c in countries:
@@ -44,6 +46,8 @@ class ParkrunList():
 
     def __update(self, sql, add):
         c = Connection(self.config)
+        if self.mode == Mode.NEWEVENTS:
+            sql += " where LastUpdated < dateadd(day,-7,getdate())"
         data = c.execute(sql)
         for row in data:
             if add:

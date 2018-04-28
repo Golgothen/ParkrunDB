@@ -10,3 +10,4 @@ __pycache__/
 =======
 *.log
 >>>>>>> branch 'MultirocessLogger' of https://github.com/Golgothen/ParkrunDB.git
+/run.bat

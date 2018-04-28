@@ -48,7 +48,7 @@ def updateScreen(procs, qsize):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--processes', type = int, default = -1, help = 'Specify number of worker processes. Default is number of system cores.')
+    parser.add_argument('--processes', type = int, default = 2, help = 'Specify number of worker processes. Default is number of system cores.')
     parser.add_argument('--country', nargs = '+',  help = 'Specify country/ies to import. Surround the name with double quotes if it contains a space. Seperate multiple countries with spaces.')
     parser.add_argument('--region', nargs = '+',  help = 'Specify region/s to import. Surround the name with double quotes if it contains a space. Seperate multiple regions with spaces.')
     parser.add_argument('--event', nargs = '+',  help = 'Specify event/s to import. Surround the name with double quotes if it contains a space. Seperate multiple events with spaces.')
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--exclude_region', nargs = '+',  help = 'Specify region/s to exclude from import. Surround the name with double quotes if it contains a space. Seperate multiple regions with spaces.')
     parser.add_argument('--exclude_event', nargs = '+',  help = 'Specify event/s to exclude from import. Surround the name with double quotes if it contains a space. Seperate multiple events with spaces.')
     parser.add_argument('--mode', nargs = 1, default = ['Normal'], help = 'Valid modes are Normal, CheckURLs or NewEvents')
-    parser.add_argument('--delay', type = int, default = 0, help = 'Wait n seconds before processing the next event')
+    parser.add_argument('--delay', type = int, default = 10, help = 'Wait n seconds before processing the next event')
     args = parser.parse_args()
 
     loggingQueue = multiprocessing.Queue()
@@ -70,10 +70,12 @@ if __name__ == '__main__':
     logger = logging.getLogger('application')
     
     mode = Mode.default()
+
+    mode = Mode[args.mode[0].upper()]
     
     logger.debug(args)
     #First, build a list of events that need to be checked.
-    l = ParkrunList(config)
+    l = ParkrunList(config, mode)
     if args.country is not None: l.countries(args.country, True)
     if args.region is not None: l.regions(args.region, True)
     if args.event is not None: l.events(args.event, True)
@@ -86,8 +88,6 @@ if __name__ == '__main__':
     if args.exclude_country is not None: l.countries(args.exclude_country, False)
     if args.exclude_region is not None: l.regions(args.exclude_region, False)
     if args.exclude_event is not None: l.events(args.exclude_event, False)
-
-    mode = Mode[args.mode[0].upper()]
     
     if int(args.processes) == -1:
         processes = multiprocessing.cpu_count()
