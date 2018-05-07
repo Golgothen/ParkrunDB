@@ -47,7 +47,7 @@ class ParkrunList():
     def __update(self, sql, add):
         c = Connection(self.config)
         if self.mode == Mode.NEWEVENTS:
-            sql += " where LastUpdated < dateadd(day,-7,getdate())"
+            sql += " where LastUpdated < dateadd(day,-7,getdate()) or LastUpdated IS NULL"
         data = c.execute(sql)
         for row in data:
             if add:
