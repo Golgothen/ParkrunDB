@@ -228,11 +228,11 @@ class Worker(multiprocessing.Process):
         if html is None:  #most likely a 404 error
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
-            return None
+            return 0, None, None
         if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
-            return None
+            return 0, None, None
         eventHTML = html.split('<h2>')[1]
         eventHTML = eventHTML.split('</h2>')[0]
         if len(eventHTML.split('#')[1].split('-')[0].strip()) == 0:
