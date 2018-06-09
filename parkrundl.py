@@ -120,6 +120,7 @@ if __name__ == '__main__':
 
     paintScreen(procs, workQueue.qsize())
         
+    c = Cinnection(config)
     
     while not workQueue.empty():
         m = r.get()
@@ -128,6 +129,7 @@ if __name__ == '__main__':
         else:
             procs[m.id].message = m.message
         updateScreen(procs, workQueue.qsize())
+    c.execute("update p set p.LastUpdated = e.LastEvent from parkruns as p inner join (select ParkrunID, max(EventDate) as LastEvent from events group by ParkrunID) as e on p.ParkrunID = e.ParkrunID")
         
     for x in p:
         x.join()
