@@ -98,6 +98,7 @@ class Worker(multiprocessing.Process):
                                 self.logger.debug('getEvent found no runners')
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
+            c.execute("update p set p.LastUpdated = e.LastEvent from parkruns as p inner join (select ParkrunID, max(EventDate) as LastEvent from events group by ParkrunID) as e on p.ParkrunID = e.ParkrunID")
             self.logger.debug('Sleeping for {} seconds'.format(self.delay))
             sleep(self.delay)
         c.close()
@@ -113,6 +114,9 @@ class Worker(multiprocessing.Process):
                 self.logger.warning('Got HTTP Error {}'.format(e.code))
                 if e.code == 404:
                     self.msgQ.put(Message('Error',self.id, 'Bad URL ' + url))
+                    return None
+                if e.code == 403:
+                    self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
                     return None
                 self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
                 sleep(1)
