@@ -72,7 +72,7 @@ class Worker(multiprocessing.Process):
                         for row in data:
                             row['EventID'] = eventID
                             c.addParkrunEventPosition(row)
-                            sleep(self.delay)
+                        sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
                 data = self.getEventHistory(parkrun['url'] + parkrun['EventHistoryURL'])
@@ -95,7 +95,7 @@ class Worker(multiprocessing.Process):
                                 for eRow in eData:
                                     eRow['EventID'] = eventID
                                     c.addParkrunEventPosition(eRow)
-                                    sleep(self.delay)
+                                sleep(self.delay)
                             else:
                                 self.logger.debug('getEvent found no runners')
                 else:
