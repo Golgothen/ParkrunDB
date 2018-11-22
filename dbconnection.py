@@ -62,7 +62,7 @@ class Connection():
                 c.commit()
                 return None
         except:
-            self.logger.error('Error occured executing statement',exec_info = True, stack_info = True)
+            self.logger.error('Error occured executing statement',exc_info = True, stack_info = True)
             if sql[:6] in ['INSERT', 'DELETE', 'UPDATE']:
                 if c is not None:
                     self.logger.error('Rolling back previous statement')
@@ -148,7 +148,7 @@ class Connection():
         if len(data) == 0:
             try:
                 sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, AgeCategoryID, Gender"
-                values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName']) + "', '" + xstr(athlete['LastName']) + "', "  + xstr(self.getAgeCatID(athlete)) + ", '" + xstr(athlete['Gender']) + "'" 
+                values = " VALUES (" + xstr(athlete['AthleteID']) + ", '" + xstr(athlete['FirstName'][:50]) + "', '" + xstr(athlete['LastName'][:50]) + "', "  + xstr(self.getAgeCatID(athlete)) + ", '" + xstr(athlete['Gender']) + "'" 
                 if athlete['Club'] is not None:
                     sql += ", ClubID"
                     values += ", " + xstr(self.getClub(athlete['Club']))
@@ -168,12 +168,12 @@ class Connection():
             if athlete['AthleteID'] != 0:
                 if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete) or \
                    data[0]['ClubID'] != self.getClub(athlete['Club']) or \
-                   data[0]['FirstName'] != athlete['FirstName'] or \
-                   data[0]['LastName'] != athlete['LastName']:
+                   data[0]['FirstName'][:50] != athlete['FirstName'][:50] or \
+                   data[0]['LastName'][:50] != athlete['LastName'][:50]:
                     self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete)) + \
                                  ", ClubID = " + xstr(self.getClub(athlete['Club'])) + \
-                                 ", FirstName = '" + athlete['FirstName'] + "'" + \
-                                 ", LastName = '" + athlete['LastName'] + "'" + \
+                                 ", FirstName = '" + athlete['FirstName'][:50] + "'" + \
+                                 ", LastName = '" + athlete['LastName'][:50] + "'" + \
                                  " WHERE AthleteID = " + str(athlete['AthleteID']))
             
     def addParkrunEventPosition(self, position):
