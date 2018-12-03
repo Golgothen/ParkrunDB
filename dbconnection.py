@@ -28,20 +28,23 @@ class Connection():
         c = None
         try:
             if sql[:6].upper() == "SELECT":
-                data = []
-                headings = []
-                c = self.conn.execute(sql)
-                if c.description is not None:
-                    for h in c.description:
-                        headings.append(h[0])
-                    for row in c.fetchall():
-                        d = {}
-                        for h, v in zip(headings, row):
-                            d[h]=v
-                        data.append(d)
-                    return data
+                if "FROM" in sql.upper():
+                    data = []
+                    headings = []
+                    c = self.conn.execute(sql)
+                    if c.description is not None:
+                        for h in c.description:
+                            headings.append(h[0])
+                        for row in c.fetchall():
+                            d = {}
+                            for h, v in zip(headings, row):
+                                d[h]=v
+                            data.append(d)
+                        return data
+                    else:
+                        return None
                 else:
-                    return None
+                    c = self.conn.execute(sql)
             if sql[:6].upper() == "INSERT":
                 c = self.conn.execute(sql)
                 c = self.conn.execute("SELECT SCOPE_IDENTITY()")
