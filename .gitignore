@@ -8,3 +8,4 @@ __pycache__/
 *.log
 /Parkrun_fe_Backup.accdb
 /Parkrun_fe.laccdb
+/test.py

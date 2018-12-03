@@ -45,6 +45,7 @@ class Connection():
                         return None
                 else:
                     c = self.conn.execute(sql)
+                    return c.fetchall()[0][0]
             if sql[:6].upper() == "INSERT":
                 c = self.conn.execute(sql)
                 c = self.conn.execute("SELECT SCOPE_IDENTITY()")
@@ -118,18 +119,13 @@ class Connection():
         return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['Name'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def replaceParkrunEvent(self, row):
-        data = self.execute("SELECT EventID FROM getEventID('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")")
-        if len(data) != 0:
-            self.execute("DELETE FROM Events WHERE EventID = " + xstr(data[0]['EventID']))
+        EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['Name'], row['EventNumber']))
+        if EventID is not None:
+            self.execute("DELETE FROM Events WHERE EventID = {}".format(EventID))
         return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['Name'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def checkParkrunEvent(self, row):
-        data = self.execute("SELECT Runners FROM getParkrunEventRunners('" + row['Name'] + "', " + xstr(row['EventNumber']) + ")")
-        if len(data) == 0:
-            r =  0
-        else:
-            r = data[0]['Runners']
-        return r == row['Runners']
+        return self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['Name'], row['EventNumber'])) == row['Runners']
 
     def getClub(self, club):
         if self.cachedClub is None:
@@ -147,7 +143,7 @@ class Connection():
             return self.cachedClub[club]
             
     def addAthlete(self, athlete):
-        data = self.execute("SELECT AthleteID, FirstName, LastName, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = " + str(athlete['AthleteID']))
+        data = self.execute("SELECT AthleteID, FirstName, LastName, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = {}".format(athlete['AthleteID']))
         if len(data) == 0:
             try:
                 sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, AgeCategoryID, Gender"
