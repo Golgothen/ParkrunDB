@@ -11,6 +11,7 @@ class ParkrunList():
         logging.config.dictConfig(config)
         self.logger = logging.getLogger(__name__)
         self.mode = mode
+        self.inactive = False
         
     def countries(self, countries, add):
         for c in countries:
@@ -42,6 +43,9 @@ class ParkrunList():
     def addAll(self):
         self.logger.debug('Adding everything.')
         sql = "SELECT * FROM getLastImportedEvent()"
+        if not self.inactive:
+            sql += " where Active = 1"
+            
         self.__update(sql, True)
 
     def __update(self, sql, add):

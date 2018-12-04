@@ -48,7 +48,7 @@ if __name__ == '__main__':
     #logger = logging.getLogger('application')
 
     c = Connection(config)
-    data = c.execute("select * from getAthleteCheckHistoryList(500) order by EventCount DESC")
+    data = c.execute("select * from getAthleteCheckHistoryList(5000) order by EventCount DESC")
     
     baseURL = "http://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber="
     
