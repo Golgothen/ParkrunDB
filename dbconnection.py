@@ -74,13 +74,7 @@ class Connection():
             raise
         
     def getParkrunID(self, parkrunName):
-        if self.cachedParkrun is None:
-            data = self.execute("SELECT ParkrunID, ParkrunName FROM Parkruns")
-            self.cachedParkrun = {}
-            for row in data:
-                self.cachedParkrun[row['ParkrunName']] = row['ParkrunID']
-            self.logger.debug('Added {} records to Parkrun cache'.format(len(self.cachedParkrun))) 
-        return self.cachedParkrun[parkrunName]
+        return self.execute("SELECT dbo.getParkrunID('{}')".format(parkrunName))
 
     def getAgeCatID(self, athlete):
         if athlete['Age Cat'] is None:

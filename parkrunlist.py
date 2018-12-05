@@ -19,7 +19,7 @@ class ParkrunList():
                 self.logger.debug('Adding {} to Countries.'.format(c))
             else:
                 self.logger.debug('Removing {} from Countries.'.format(c))
-            sql = "SELECT * FROM getLastImportedEventByCountry('" + c + "')"
+            sql = "SELECT * FROM getLastImportedEventByCountry('{}')".format(c)
             self.__update(sql, add)
     
     def regions(self, regions, add):
@@ -28,16 +28,21 @@ class ParkrunList():
                 self.logger.debug('Adding {} to Regions.'.format(r))
             else:
                 self.logger.debug('Removing {} from Regions.'.format(r))
-            sql = "SELECT * FROM getLastImportedEventByRegion('" + r + "')"
+            sql = "SELECT * FROM getLastImportedEventByRegion('{}')".format(r)
             self.__update(sql, add)
     
     def events(self, events, add):
-        for e in events:
-            if add:
-                self.logger.debug('Adding {} to Events.'.format(e))
-            else:
-                self.logger.debug('Removing {} from Events.'.format(e))
-            sql = "SELECT * FROM getLastImportedEventByEvent('" + e + "')"
+        if type(events).__name__ == 'list':
+            for e in events:
+                if add:
+                    self.logger.debug('Adding {} to Events.'.format(e))
+                else:
+                    self.logger.debug('Removing {} from Events.'.format(e))
+                sql = "SELECT * FROM getLastImportedEventByEvent('{}')".format(e)
+                self.__update(sql, add)
+            return
+        if type(events).__name__ == 'str':
+            sql = "SELECT * FROM getLastImportedEventByEvent('{}')".format(events)
             self.__update(sql, add)
     
     def addAll(self):

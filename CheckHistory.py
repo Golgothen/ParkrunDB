@@ -5,6 +5,9 @@ from urllib.request import urlopen, Request #, localhost
 from urllib.error import HTTPError
 from time import sleep
 
+#from parkrunlist import ParkrunList
+#from worker import *
+
 import logging, logging.config, multiprocessing, lxml.html
 
 
@@ -33,6 +36,101 @@ def getURL(url):
     #logger.debug('URL returned string of length {}'.format(len(temp)))
     return temp 
 
+def getEvent(url, parkrunEvent):
+    #self.logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
+    html = getURL(url + str(parkrunEvent))
+    #Test if we got a valid response'
+    if html is None:  #most likely a 404 error
+        #self.logger.warning('Error retrieving event')
+        #self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
+        return None
+    if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+        #self.logger.warning('Error retrieving event')
+        #self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
+        return None
+    html = '<table' + html.split('<table')[1].split('</p>')[0]
+    table = lxml.html.fromstring(html)
+    return getEventTable(table)
+
+def getEventTable(tableHTML):
+    headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
+    
+    rows = tableHTML.xpath('//tbody/tr')
+    
+    if len(rows) > 0:
+        if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
+            headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note','Strava']
+    else:
+        headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
+    data = []
+    
+    for row in rows:
+        d = {}
+        for h, v in zip(headings, row.getchildren()):
+            if h in ['Time','Note']:
+                d[h]=v.text
+                if h == 'Time':
+                    if d[h] is not None:
+                        if len(d[h])<6:
+                            d[h] = '0:' + d[h]
+            if h == 'Pos':
+                d[h]=int(v.text)
+            if h == 'Age Grade':
+                if v.text is not None:
+                    d[h]=float(v.text.split()[0])
+                else:
+                    d[h]=None
+            if h == 'parkrunner':
+                if len(v.getchildren())>0:
+                    d['FirstName']=v.getchildren()[0].text.split()[0].replace("'","''")
+                    lastName = ''
+                    for i in range(1, len(v.getchildren()[0].text.split())):
+                        lastName+=v.getchildren()[0].text.split()[i].capitalize().replace("'","''") + ' '
+                    if lastName != '':
+                        d['LastName'] = lastName.strip()
+                    else:
+                        d['LastName'] = None
+                    d['AthleteID']=int(v.getchildren()[0].get('href').split('=')[1])
+                else:
+                    d['FirstName']=v.text.replace("'","''")
+                    d['LastName']=None
+                    d['AthleteID']=0
+            if h == 'Strava':
+                if len(v.getchildren())>0:
+                    added = False
+                    for c in v.getchildren():
+                        if 'strava' in c.get('href'):
+                            d['StravaID']=c.get('href').split('/')[4]
+                            added = True
+                    if not added:
+                        d['StravaID']=None
+                else:
+                    d['StravaID']=None
+            if h == 'Age Cat':
+                if len(v.getchildren())>0:
+                    d[h]=v.getchildren()[0].text
+                else:
+                    d[h]=None
+            if h == 'Gender':
+                if v.text is not None:
+                    d[h]=v.text
+                else:
+                    d[h]='M'
+            if h == 'Club':
+                if len(v.getchildren())>0:
+                    if v.getchildren()[0].text is not None:
+                        d[h]=v.getchildren()[0].text.replace("'","''")
+                    else:
+                        d[h]=None
+                else:
+                    d[h]=None
+        data.append(d)
+    if len(data) > 0:
+        if 'Pos' not in data[0].keys():
+            data = sorted(data, key=lambda k: '0:00:00' if k['Time'] is None else k['Time'])
+            for i in range(len(data)):
+                data[i]['Pos'] = i + 1
+    return data
 
 
 if __name__ == '__main__':
@@ -48,80 +146,75 @@ if __name__ == '__main__':
     #logger = logging.getLogger('application')
 
     c = Connection(config)
-    data = c.execute("select * from getAthleteCheckHistoryList(5000) order by EventCount DESC")
+    data = c.execute("select * from getAthleteCheckHistoryList(5000) ORDER BY EventCount DESC")
     
-    baseURL = "http://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber="
+    #l = ParkrunList(config, Mode.NORMAL)
+    #workQue = multiprocessing.Queue()
+    #messageQue = multiprocessing.Queue()
+        
+    baseURL = "http://www.parkrun.com.au/results/athleteeventresultshistory/?athleteNumber={}&eventNumber=0"
     
     for athlete in data:
+        athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
         print("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
-        html = getURL(baseURL + str(athlete['AthleteID']))
-        # Take everything after the H2 tag
-        html = html.split('<h2>')[1]
-        #separate the run count
-        runcount = int(html.split('</h2>')[0].split(' parkruns')[0].split('(')[-1])
+        html = getURL(baseURL.format(athlete['AthleteID']))
+        runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
         if athlete['EventCount'] != runcount:
-            print("Athlete {} {}, {} run count does not match.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
             eventsMissing = runcount - athlete['EventCount']
             print("Missing {} runs".format(eventsMissing))
-            
-            #tablehtml = html.split('<h1>Event Summaries</h1>')[1].split('</table>')[0] + '</table>'
-            rows = lxml.html.fromstring(html.split('<h1>Event Summaries</h1>')[1].split('</table>')[0] + '</table>').xpath('//tbody/tr')
-            
-            for row in rows:  # Iterate through the events in the summary table
-                currentParkrun = row[0][0].get('href').split('/')[3]
-                currentParkrunName = row[0][0].text.split(' parkrun')[0]
-                sql = "SELECT dbo.getAthleteParkrunCount({},'{}')".format(athlete['AthleteID'],currentParkrun)
-                # Check each event in the summary to see if the count matches
-                if c.execute(sql) != int(row.getchildren()[1].text):
-                    print("Count mismatch for {}.  Checking history".format(currentParkrunName))
-                    # Missing run is one of the events listed in the summary
-                    # Retrieve the event summary to find out which event number is missing
-                    eventHistoryhtml = getURL(row.getchildren()[5].getchildren()[0].get('href'))
-                    #hist_rows = lxml.html.fromstring('<table>' + eventHistoryhtml.split('<caption>All Results</caption>')[1].split('</div>')[0]).xpath('//tbody/tr')
-                    hist_rows = lxml.html.fromstring('<table>' + eventHistoryhtml.split('<table')[3].split('</div>')[0]).xpath('//tbody/tr')
-                    if eventsMissing > 0:
-                        for hist_row in hist_rows:
-                            eventNumber = int(hist_row.getchildren()[1].getchildren()[0].text)
-                            position =  int(hist_row.getchildren()[2].text)
-                            found = False
-                            hist_data = c.execute("SELECT * FROM getAthleteParkrunEventPositions({},'{}')".format(athlete['AthleteID'],currentParkrun))
-                            #if len(hist_data) == 0:
-                            #    print("No event data for event {}, URL: {}.  Rectify and rerun.".format(currentParkrun, row.getchildren()[0].getchildren()[0].get('href')))
-                            #    continue
-                            for d in hist_data:
-                                if d['EventNumber'] == eventNumber:
-                                    found = True
-                                    break
-                            #if not any(d['EventNumber'] ==  eventNumber for d in hist_data):
-                            if not found:
-                                print("Missing event {} for parkrun {}, position {}".format(eventNumber, currentParkrunName, position))
-                                if c.execute("SELECT dbo.getAthleteIDParkrunEventPosition('{}',{},{})".format(currentParkrun, eventNumber, position)) == 0:
-                                    print("Deleting due to unknown athlete being reassigned to position {}".format(position))
-                                else:
-                                    print("Deleting due to finish order mismatch")
-                                c.execute("DELETE FROM Events WHERE EventID = dbo.getEventURLID('{}', {})".format(currentParkrun, eventNumber))
-                    else:
-                        # Event has been deleted from athlete history.  Find out which one
-                        hist_data = c.execute("SELECT * FROM getAthleteParkrunEventPositions({},'{}')".format(athlete['AthleteID'],currentParkrun))
-                        for d in hist_data:
-                            eventNumber = d['EventNumber']
-                            for hist_row in hist_rows:
-                                found = False
-                                if eventNumber == int(hist_row.getchildren()[1].getchildren()[0].text):
-                                #position =  int(hist_row.getchildren()[2].text)
-                                #hist_data = c.execute("SELECT * FROM getAthleteParkrunEventPositions({},'{}')".format(athlete['AthleteID'],currentParkrun))
-                                #if len(hist_data) == 0:
-                                #    print("No event data for event {}, URL: {}.  Rectify and rerun.".format(currentParkrun, row.getchildren()[0].getchildren()[0].get('href')))
-                                #    continue
-                                    found = True
-                                    break
-                            #if not any(d['EventNumber'] ==  eventNumber for d in hist_data):
-                            if not found:
-                                print("Deleted event {} for parkrun {}".format(eventNumber, currentParkrunName))
-                                c.execute("DELETE FROM Events WHERE EventID = dbo.getEventURLID('{}', {})".format(currentParkrun, eventNumber))
-                    sleep(5)    
+            rows = rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
+            hist_data = c.execute("SELECT * FROM getAthleteEventSummary({})".format(athlete['AthleteID']))
+            if eventsMissing > 0:
+                for row in rows:  # Iterate through the events in the summary table
+                    currentParkrun = row[0][0].get('href').split('/')[3]
+                    currentParkrunName = row[0][0].text.split(' parkrun')[0]
+                    currentDate = datetime.strptime(row[1][0].text,"%d/%m/%Y")
+                    eventNumber = int(row[2][0].get('href').split('=')[1])
+                    found = False
+                    for d in hist_data:
+                        if d['URL'] == currentParkrun and d['EventNumber'] == eventNumber:
+                            found = True
+                            break
+                    if not found:
+                        print("Missed event {} for parkrun {}".format(eventNumber, currentParkrunName))
+                        eventURL = c.execute("SELECT dbo.getEventURL('{}')".format(currentParkrun))
+                        if eventURL is not None:
+                            event_data = getEvent(eventURL, eventNumber)
+                            eventID = c.replaceParkrunEvent({'Name': currentParkrun, 'EventNumber': eventNumber, 'EventDate': currentDate})
+                            if event_data is not None:
+                                for edata in event_data:
+                                    edata['EventID'] = eventID
+                                    c.addParkrunEventPosition(edata)
+                                print("Reloaded event {} for parkrun {}".format(eventNumber, currentParkrunName))
+                                eventsMissing -= 1 
+                        else:
+                            print("Possible new event {} - URL {}. Investigate and retry.".format(currentParkrunName, row[0][0].get('href')))
+                if eventsMissing == 0:
+                    c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
+                    print("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
+            else:
+                # Event has been deleted from athlete history.  Find out which one
+                for d in hist_data:
+                    found = False
+                    for row in rows:
+                        if d['URL'] == row.getchildren()[0].getchildren()[0].get('href').split('/')[3] and \
+                           d['EventNumber'] == int(row.getchildren()[2].getchildren()[0].get('href').split('=')[1]):
+                            found = True
+                            break
+                    if not found:
+                        print("Deleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
+                        event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
+                        eventID = c.replaceParkrunEvent({'Name': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
+                        if event_data is not None:
+                            for edata in event_data:
+                                edata['EventID'] = eventID
+                                c.addParkrunEventPosition(edata)
+                            print("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
+                            eventsMissing += 1
+                if eventsMissing == 0:
+                    c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
+                    print("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
         else:
             c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
-            #print("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
-        sleep(5)
-        
+            print("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
+        sleep(3)
