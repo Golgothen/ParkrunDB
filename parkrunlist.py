@@ -20,6 +20,8 @@ class ParkrunList():
             else:
                 self.logger.debug('Removing {} from Countries.'.format(c))
             sql = "SELECT * FROM getLastImportedEventByCountry('{}')".format(c)
+            if not self.inactive:
+                sql += " where Active = 1"
             self.__update(sql, add)
     
     def regions(self, regions, add):
@@ -29,6 +31,8 @@ class ParkrunList():
             else:
                 self.logger.debug('Removing {} from Regions.'.format(r))
             sql = "SELECT * FROM getLastImportedEventByRegion('{}')".format(r)
+            if not self.inactive:
+                sql += " where Active = 1"
             self.__update(sql, add)
     
     def events(self, events, add):
@@ -40,10 +44,14 @@ class ParkrunList():
                     self.logger.debug('Removing {} from Events.'.format(e))
                 sql = "SELECT * FROM getLastImportedEventByEvent('{}')".format(e)
                 self.__update(sql, add)
+                if not self.inactive:
+                    sql += " where Active = 1"
             return
         if type(events).__name__ == 'str':
             sql = "SELECT * FROM getLastImportedEventByEvent('{}')".format(events)
             self.__update(sql, add)
+            if not self.inactive:
+                sql += " where Active = 1"
     
     def addAll(self):
         self.logger.debug('Adding everything.')

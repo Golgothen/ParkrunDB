@@ -135,30 +135,16 @@ def getEventTable(tableHTML):
 
 if __name__ == '__main__':
     
-    #loggingQueue = multiprocessing.Queue()
-
-    #listener = LogListener(loggingQueue)
-    #listener.start()
-    
     config = sender_config
-    #config['handlers']['queue']['queue'] = loggingQueue
-    #logging.config.dictConfig(config)
-    #logger = logging.getLogger('application')
-
     c = Connection(config)
     data = c.execute("select * from getAthleteCheckHistoryList(5000) ORDER BY EventCount DESC")
-    
-    #l = ParkrunList(config, Mode.NORMAL)
-    #workQue = multiprocessing.Queue()
-    #messageQue = multiprocessing.Queue()
-        
     baseURL = "http://www.parkrun.com.au/results/athleteeventresultshistory/?athleteNumber={}&eventNumber=0"
-    
+
     for athlete in data:
         athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
         print("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
         html = getURL(baseURL.format(athlete['AthleteID']))
-        runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
+        runcount = int(html.split('<h2>')[1].split('<br/>')[0].split('- ')[1].split(' ')[0])
         if athlete['EventCount'] != runcount:
             eventsMissing = runcount - athlete['EventCount']
             print("Missing {} runs".format(eventsMissing))
