@@ -167,7 +167,7 @@ class Worker(multiprocessing.Process):
                         if lastName != '':
                             d['LastName'] = lastName.strip()
                         else:
-                            d['LastName'] = None
+                            d['LastName'] = ''
                         d['AthleteID']=int(v.getchildren()[0].get('href').split('=')[1])
                     else:
                         d['FirstName']=v.text.replace("'","''")
