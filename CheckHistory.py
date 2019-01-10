@@ -149,7 +149,7 @@ if __name__ == '__main__':
             eventsMissing = runcount - athlete['EventCount']
             print("Missing {} runs".format(eventsMissing))
             rows = rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
-            hist_data = c.execute("SELECT * FROM getAthleteEventSummary({})".format(athlete['AthleteID']))
+            hist_data = c.execute("SELECT * FROM getAthleteEventHistory({})".format(athlete['AthleteID']))
             if eventsMissing > 0:
                 for row in rows:  # Iterate through the events in the summary table
                     currentParkrun = row[0][0].get('href').split('/')[3]
