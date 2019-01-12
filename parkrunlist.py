@@ -57,9 +57,9 @@ class ParkrunList():
             sql += " where Active = 1"
         if self.mode == Mode.NEWEVENTS:
             if not self.inactive:
-                sql += ' AND (LastUpdated < getdate() or LastUpdated IS NULL)'
+                sql += ' AND (LastUpdated < dateadd(day, -1, getdate()) or LastUpdated IS NULL)'
             else:
-                sql += ' WHERE (LastUpdated < getdate() or LastUpdated IS NULL)'
+                sql += ' WHERE (LastUpdated < dateadd(day, -1, getdate()) or LastUpdated IS NULL)'
                 
         data = c.execute(sql)
         for row in data:
