@@ -119,7 +119,11 @@ class Connection():
         return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['Name'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def checkParkrunEvent(self, row):
-        return self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['Name'], row['EventNumber'])) == row['Runners']
+        r = self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['Name'], row['EventNumber'])) == row['Runners']
+        if r is None:
+            return 0
+        else:
+            return r
 
     def getClub(self, club):
         if self.cachedClub is None:

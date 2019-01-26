@@ -110,7 +110,7 @@ class Worker(multiprocessing.Process):
         while not completed:
             try:
                 self.logger.debug('Hitting {}'.format(url))
-                f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'}))
+                f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}))
                 completed = True
             except HTTPError as e:
                 self.logger.warning('Got HTTP Error {}'.format(e.code))
