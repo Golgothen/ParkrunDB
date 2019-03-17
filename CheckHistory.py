@@ -203,4 +203,4 @@ if __name__ == '__main__':
         else:
             c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
             print("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
-        sleep(3)
+        #sleep(3)
