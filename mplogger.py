@@ -13,16 +13,16 @@ sender_config = {
     },
     'loggers': {
         'application': {
-            'level':       'WARNING',
+            'level':       'INFO',
         },
         'worker': {
-            'level':       'WARNING',
+            'level':       'INFO',
         },
         'parkrunlist': {
-            'level':       'WARNING',
+            'level':       'INFO',
         },
         'dbconnection': {
-            'level':       'WARNING',
+            'level':       'INFO',
         },
     },
     'root': {
