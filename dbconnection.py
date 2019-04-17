@@ -189,7 +189,7 @@ class Connection():
             values += ", " + xstr(position['Age Grade'])
         if position['Note'] is not  None:
             sql += ", Comment" 
-            values +=  ", '" + xstr(position['Note']) + "'"
+            values +=  ", '" + position['Note'][:30].replace("'","") + "'"
         sql += ")" + values + ")"
         self.execute(sql)
     
