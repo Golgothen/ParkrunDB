@@ -142,12 +142,12 @@ if __name__ == '__main__':
 
     for athlete in data:
         athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
-        print("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
+        print("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']), end='', flush=True)
         html = getURL(baseURL.format(athlete['AthleteID']))
         runcount = int(html.split('<h2>')[1].split('<br/>')[0].split('- ')[1].split(' ')[0])
         if athlete['EventCount'] != runcount:
             eventsMissing = runcount - athlete['EventCount']
-            print("Missing {} runs".format(eventsMissing))
+            print("\nMissing {} runs".format(eventsMissing))
             rows = rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
             hist_data = c.execute("SELECT * FROM getAthleteEventHistory({})".format(athlete['AthleteID']))
             if eventsMissing > 0:
@@ -188,7 +188,7 @@ if __name__ == '__main__':
                             found = True
                             break
                     if not found:
-                        print("Deleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
+                        print("\nDeleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
                         event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
                         eventID = c.replaceParkrunEvent({'Name': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
                         if event_data is not None:
@@ -202,5 +202,5 @@ if __name__ == '__main__':
                     print("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
         else:
             c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
-            print("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
-        #sleep(3)
+            print(" run count OK.")
+        sleep(3)
