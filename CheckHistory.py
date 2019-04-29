@@ -141,7 +141,7 @@ if __name__ == '__main__':
     baseURL = "http://www.parkrun.com.au/results/athleteeventresultshistory/?athleteNumber={}&eventNumber=0"
 
     for athlete in data:
-        athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
+        athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCountWithoutJuniors({})".format(athlete['AthleteID']))
         print("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']), end='', flush=True)
         html = getURL(baseURL.format(athlete['AthleteID']))
         runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
