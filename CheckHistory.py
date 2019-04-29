@@ -144,7 +144,7 @@ if __name__ == '__main__':
         athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
         print("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']), end='', flush=True)
         html = getURL(baseURL.format(athlete['AthleteID']))
-        runcount = int(html.split('<h2>')[1].split('<br/>')[0].split('- ')[1].split(' ')[0])
+        runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
         if athlete['EventCount'] != runcount:
             eventsMissing = runcount - athlete['EventCount']
             print("\nMissing {} runs".format(eventsMissing))
