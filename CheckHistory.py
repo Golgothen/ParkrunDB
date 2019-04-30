@@ -137,7 +137,7 @@ if __name__ == '__main__':
     
     config = sender_config
     c = Connection(config)
-    data = c.execute("select * from getAthleteCheckHistoryList(5000) ORDER BY EventCount DESC")
+    data = c.execute("select * from getAthleteCheckHistoryList(40) ORDER BY EventCount DESC")
     baseURL = "http://www.parkrun.com.au/results/athleteeventresultshistory/?athleteNumber={}&eventNumber=0"
 
     for athlete in data:
