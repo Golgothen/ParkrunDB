@@ -44,7 +44,7 @@ class Worker(multiprocessing.Process):
                 self.logger.info('Process {} Exiting'.format(self.id))
                 self.msgQ.put(Message('Process', self.id, 'Exiting'))
                 break
-            self.logger.debug('Process {} got record {}'.format(self.id, parkrun))
+            self.logger.debug('Process {} got record {}'.format(self.id, parkrun['url']))
             if parkrun['lastEvent'] is None: parkrun['lastEvent'] = 0
             if self.mode == Mode.CHECKURLS:
                 if self.getURL(parkrun['url']) is not None:
@@ -80,13 +80,15 @@ class Worker(multiprocessing.Process):
                     self.logger.debug('Event {} got {} events in history'.format(parkrun['url'], len(data)))
                     for row in data:
                         row['Name'] = parkrun['Name']
+                        row['URL'] = parkrun['url'].split('/')[3]
                         # Add the event if it's a new event
                         self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                        self.logger.debug('Process {} Checking {} event {}'.format(self.id, row['Name'], xstr(row['EventNumber'])))
+                        #self.logger.debug(row)
+                        self.logger.debug('Process {} Checking {} event {}'.format(self.id, row['URL'], xstr(row['EventNumber'])))
                         # Check the event has the correct number of runners
                         if not c.checkParkrunEvent(row):
                             #if not, delete the old event record and re-import the data
-                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['Name'], row['EventNumber']))
+                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['url'], row['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
                             eData = self.getEvent(parkrun['url'] + parkrun['EventNumberURL'], row['EventNumber'])

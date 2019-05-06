@@ -15,6 +15,9 @@ sender_config = {
         'application': {
             'level':       'INFO',
         },
+        'checkhistory': {
+            'level':       'INFO',
+        },
         'worker': {
             'level':       'INFO',
         },

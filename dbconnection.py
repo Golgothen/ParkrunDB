@@ -110,20 +110,23 @@ class Connection():
             return self.cachedAgeCat[ageCat]
     
     def addParkrunEvent(self, parkrun):
-        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['Name'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
+        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['URL'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def replaceParkrunEvent(self, row):
-        EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['Name'], row['EventNumber']))
+        EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['URL'], row['EventNumber']))
         if EventID is not None:
             self.execute("DELETE FROM Events WHERE EventID = {}".format(EventID))
-        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['Name'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
+        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['URL'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def checkParkrunEvent(self, row):
-        r = self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['Name'], row['EventNumber'])) == row['Runners']
+        r = self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['URL'], row['EventNumber']))
         if r is None:
-            return 0
+            return False
         else:
-            return r
+            if r != row['Runners']:
+                return False
+            else:
+                return True
 
     def getClub(self, club):
         if self.cachedClub is None:
@@ -173,8 +176,9 @@ class Connection():
                                  ", LastName = '" + athlete['LastName'][:50] + "'" + \
                                  " WHERE AthleteID = " + str(athlete['AthleteID']))
             
-    def addParkrunEventPosition(self, position):
-        self.addAthlete(position)
+    def addParkrunEventPosition(self, position, addAthlete = True):
+        if addAthlete:
+            self.addAthlete(position)
         sql = "INSERT INTO EventPositions (EventID, AthleteID, Position"
         values = " VALUES (" + xstr(position['EventID']) + ", " + xstr(position['AthleteID']) + ", " + xstr(position['Pos'])
 
@@ -191,6 +195,7 @@ class Connection():
             sql += ", Comment" 
             values +=  ", '" + position['Note'][:30].replace("'","") + "'"
         sql += ")" + values + ")"
+        #print(sql)
         self.execute(sql)
     
     def updateParkrunURL(self, parkrun, verified, valid):
