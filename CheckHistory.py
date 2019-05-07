@@ -219,14 +219,14 @@ if __name__ == '__main__':
                             found = True
                             break
                     if not found:
-                        print("\nDeleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
+                        print("Deleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
                         event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
-                        eventID = c.replaceParkrunEvent({'Name': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
+                        eventID = c.replaceParkrunEvent({'URL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
                         if event_data is not None:
                             for edata in event_data:
                                 edata['EventID'] = eventID
                                 c.addParkrunEventPosition(edata)
-                            logger.info("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
+                            logger.info("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['URL']))
                             eventsMissing += 1
                 if eventsMissing == 0:
                     #c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
