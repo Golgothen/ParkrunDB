@@ -156,8 +156,8 @@ if __name__ == '__main__':
         try:
             runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
         except (ValueError, IndexError):
-            print("Error reading run count")
-            logger.info("Error reading run count")
+            print("Error reading run count for Athlete {}".format(athlete['AthleteID']))
+            logger.warning("Error reading run count for Athlete {}".format(athlete['AthleteID']))
             continue
         if athlete['EventCount'] != runcount:
             eventsMissing = runcount - athlete['EventCount']
@@ -184,6 +184,8 @@ if __name__ == '__main__':
                         position['Age Grade'] = row[5].text[:-1]
                         position['Note'] = None
                     except TypeError:
+                        print("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['URL'], parkrun['EventNumber'], athlete['AthleteID']))
+                        logger.warning("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['URL'], parkrun['EventNumber'], athlete['AthleteID']))
                         continue
                     #logger.debug(parkrun['URL'])
                     #logger.debug(position)
