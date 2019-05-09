@@ -151,9 +151,14 @@ if __name__ == '__main__':
 
     for athlete in data:
         athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCountWithoutJuniors({})".format(athlete['AthleteID']))
-        logger.debug("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
+        logger.info("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
         html = getURL(baseURL.format(athlete['AthleteID']))
-        runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
+        try:
+            runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
+        except (ValueError, IndexError):
+            print("Error reading run count")
+            logger.info("Error reading run count")
+            continue
         if athlete['EventCount'] != runcount:
             eventsMissing = runcount - athlete['EventCount']
             rows = rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
@@ -163,19 +168,23 @@ if __name__ == '__main__':
                 for row in rows:  # Iterate through the events in the summary table
                     parkrun = {}
                     position = {}
-                    parkrun['URL'] = row[0][0].get('href').split('/')[3]
-                    parkrun['Name'] = row[0][0].text.split(' parkrun')[0]
-                    parkrun['EventDate'] = datetime.strptime(row[1][0].text,"%d/%m/%Y")
-                    parkrun['EventNumber'] = int(row[2][0].get('href').split('=')[1])
-                    
-                    position['AthleteID'] = athlete['AthleteID']
-                    position['Pos'] = int(row[3].text)
-                    position['Time'] = row[4].text
-                    if len(position['Time'])<6:
-                        position['Time'] = '00:' + position['Time'] 
-                    position['Age Cat'] = None
-                    position['Age Grade'] = row[5].text[:-1]
-                    position['Note'] = None
+                    try:
+                        
+                        parkrun['URL'] = row[0][0].get('href').split('/')[3]
+                        parkrun['Name'] = row[0][0].text.split(' parkrun')[0]
+                        parkrun['EventDate'] = datetime.strptime(row[1][0].text,"%d/%m/%Y")
+                        parkrun['EventNumber'] = int(row[2][0].get('href').split('=')[1])
+                        
+                        position['AthleteID'] = athlete['AthleteID']
+                        position['Pos'] = int(row[3].text)
+                        position['Time'] = row[4].text
+                        if len(position['Time'])<6:
+                            position['Time'] = '00:' + position['Time'] 
+                        position['Age Cat'] = None
+                        position['Age Grade'] = row[5].text[:-1]
+                        position['Note'] = None
+                    except TypeError:
+                        continue
                     #logger.debug(parkrun['URL'])
                     #logger.debug(position)
                     found = False
@@ -184,7 +193,7 @@ if __name__ == '__main__':
                             found = True
                             break
                     if not found:
-                        logger.debug("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['Name']))
+                        logger.debug("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['URL']))
                         parkrunType = c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun['URL']))
                         if parkrunType == 'Special':
                             logger.debug("Special Event detected")
@@ -201,7 +210,7 @@ if __name__ == '__main__':
                                     for edata in event_data:
                                         edata['EventID'] = eventID
                                         c.addParkrunEventPosition(edata)
-                                    logger.info("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['Name']))
+                                    logger.info("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['URL']))
                                     eventsMissing -= 1 
                             else:
                                 logger.warning("Possible new event URL {}. Investigate and retry.".format(row[0][0].get('href')))
