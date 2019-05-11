@@ -44,10 +44,10 @@ class Worker(multiprocessing.Process):
                 self.logger.info('Process {} Exiting'.format(self.id))
                 self.msgQ.put(Message('Process', self.id, 'Exiting'))
                 break
-            self.logger.debug('Process {} got record {}'.format(self.id, parkrun['url']))
+            self.logger.debug('Process {} got record {}'.format(self.id, parkrun['EventURL']))
             if parkrun['lastEvent'] is None: parkrun['lastEvent'] = 0
             if self.mode == Mode.CHECKURLS:
-                if self.getURL(parkrun['url']) is not None:
+                if self.getURL(parkrun['URL']) is not None:
                     c.updateParkrunURL(parkrun['Name'], True, True)
                     self.msgQ.put(Message('Process', self.id, 'Verified ' + parkrun['Name'] + ' valid'))
                 else:
@@ -55,11 +55,11 @@ class Worker(multiprocessing.Process):
                     self.msgQ.put(Message('Error', self.id, 'Could not verify ' + parkrun['Name'] + ' as valid'))
             
             if self.mode == Mode.NEWEVENTS:
-                self.logger.info('Process {} checking for new results for {}'.format(self.id, parkrun['Name']))
+                self.logger.info('Process {} checking for new results for {}'.format(self.id, parkrun['EventURL']))
                 self.msgQ.put(Message('Process', self.id, 'Checking for new results for ' + parkrun['Name'] ))
-                parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['url'] + parkrun['LatestResultsURL'])
+                parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['URL'] + parkrun['LatestResultsURL'])
                 if data is not None:
-                    self.logger.debug('Event {} got {} events in history'.format(parkrun['url'], len(data)))
+                    self.logger.debug('Event {} got {} events in history'.format(parkrun['EventURL'], len(data)))
                     parkrun['Runners'] = len(data)
                     # Add the event if it's a new event
                     # Check the event has the correct number of runners
@@ -75,12 +75,12 @@ class Worker(multiprocessing.Process):
                         sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
-                data = self.getEventHistory(parkrun['url'] + parkrun['EventHistoryURL'])
+                data = self.getEventHistory(parkrun['URL'] + parkrun['EventHistoryURL'])
                 if data is not None:
-                    self.logger.debug('Event {} got {} events in history'.format(parkrun['url'], len(data)))
+                    self.logger.debug('Event {} got {} events in history'.format(parkrun['URL'], len(data)))
                     for row in data:
                         row['Name'] = parkrun['Name']
-                        row['URL'] = parkrun['url'].split('/')[3]
+                        row['URL'] = parkrun['URL'].split('/')[3]
                         # Add the event if it's a new event
                         self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                         #self.logger.debug(row)
@@ -88,10 +88,10 @@ class Worker(multiprocessing.Process):
                         # Check the event has the correct number of runners
                         if not c.checkParkrunEvent(row):
                             #if not, delete the old event record and re-import the data
-                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['url'], row['EventNumber']))
+                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['URL'], row['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
-                            eData = self.getEvent(parkrun['url'] + parkrun['EventNumberURL'], row['EventNumber'])
+                            eData = self.getEvent(parkrun['URL'] + parkrun['EventNumberURL'], row['EventNumber'])
                             if eData is not None:
                                 self.logger.debug('getEvent found {} runners'.format(len(eData)))
                                 for eRow in eData:
@@ -241,8 +241,14 @@ class Worker(multiprocessing.Process):
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
             return 0, None, None
-        eventHTML = html.split('<h2>')[1]
-        eventHTML = eventHTML.split('</h2>')[0]
+        try:
+            eventHTML = html.split('<h2>')[1]
+            eventHTML = eventHTML.split('</h2>')[0]
+        except IndexError:
+            self.logger.warning('Error retrieving event')
+            self.msgQ.put(Message('Error', self.id, 'Possible page error retrieving url ' + url))
+            return 0, None, None
+
         if len(eventHTML.split('#')[1].split('-')[0].strip()) == 0:
             return 0, None, None
         eventNumber =  int(eventHTML.split('#')[1].split('-')[0].strip())

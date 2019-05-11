@@ -25,7 +25,8 @@ def getURL(url):
                 return None
             if e.code == 403:
                 #self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
-                return None
+                raise
+                #return None
             #self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
             sleep(1)
         except:
@@ -155,7 +156,7 @@ if __name__ == '__main__':
         html = getURL(baseURL.format(athlete['AthleteID']))
         try:
             runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
-        except (ValueError, IndexError):
+        except (ValueError, IndexError, AttributeError):
             print("Error reading run count for Athlete {}".format(athlete['AthleteID']))
             logger.warning("Error reading run count for Athlete {}".format(athlete['AthleteID']))
             continue

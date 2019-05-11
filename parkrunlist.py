@@ -67,7 +67,8 @@ class ParkrunList():
                 if row['Parkrun'] not in self.__parkruns:
                     self.logger.debug('Adding event {}'.format(row['Parkrun']))
                     self.__parkruns[row['Parkrun']] = {'Name'             :row['Parkrun'],
-                                                       'url'              :row['URL'],
+                                                       'URL'              :row['URL'],
+                                                       'EventURL'         :row['URL'].split('/')[3],
                                                        'lastEvent'        :row['LastEventNumber'],
                                                        'EventHistoryURL'  :row['EventHistoryURL'],
                                                        'EventNumberURL'   :row['EventNumberURL'],

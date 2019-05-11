@@ -113,13 +113,13 @@ class Connection():
         return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['URL'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def replaceParkrunEvent(self, row):
-        EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['URL'], row['EventNumber']))
+        EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['EventURL'], row['EventNumber']))
         if EventID is not None:
             self.execute("DELETE FROM Events WHERE EventID = {}".format(EventID))
-        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['URL'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
+        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['EventURL'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def checkParkrunEvent(self, row):
-        r = self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['URL'], row['EventNumber']))
+        r = self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['EventURL'], row['EventNumber']))
         if r is None:
             return False
         else:
