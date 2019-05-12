@@ -171,7 +171,7 @@ if __name__ == '__main__':
                     position = {}
                     try:
                         
-                        parkrun['URL'] = row[0][0].get('href').split('/')[3]
+                        parkrun['EventURL'] = row[0][0].get('href').split('/')[3]
                         parkrun['Name'] = row[0][0].text.split(' parkrun')[0]
                         parkrun['EventDate'] = datetime.strptime(row[1][0].text,"%d/%m/%Y")
                         parkrun['EventNumber'] = int(row[2][0].get('href').split('=')[1])
@@ -192,28 +192,28 @@ if __name__ == '__main__':
                     #logger.debug(position)
                     found = False
                     for d in hist_data:
-                        if d['URL'] == parkrun['URL'] and d['EventNumber'] == parkrun['EventNumber']:
+                        if d['URL'] == parkrun['EventURL'] and d['EventNumber'] == parkrun['EventNumber']:
                             found = True
                             break
                     if not found:
-                        logger.debug("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['URL']))
-                        parkrunType = c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun['URL']))
+                        logger.debug("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
+                        parkrunType = c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun['EventURL']))
                         if parkrunType == 'Special':
                             logger.debug("Special Event detected")
-                            position['EventID'] = c.execute("SELECT dbo.getEventID('{}',{})".format(parkrun['URL'], parkrun['EventNumber']))
+                            position['EventID'] = c.execute("SELECT dbo.getEventID('{}',{})".format(parkrun['EventURL'], parkrun['EventNumber']))
                             if position['EventID'] is None:
                                 position['EventID'] = c.addParkrunEvent(parkrun)
                             c.addParkrunEventPosition(position, False)
                         else:
-                            eventURL = c.execute("SELECT dbo.getEventURL('{}')".format(parkrun['URL']))
+                            eventURL = c.execute("SELECT dbo.getEventURL('{}')".format(parkrun['EventURL']))
                             if eventURL is not None:
                                 event_data = getEvent(eventURL, parkrun['EventNumber'])
-                                eventID = c.replaceParkrunEvent({'URL': parkrun['URL'], 'EventNumber': parkrun['EventNumber'], 'EventDate': parkrun['EventDate']})
+                                eventID = c.replaceParkrunEvent({'EventURL': parkrun['EventURL'], 'EventNumber': parkrun['EventNumber'], 'EventDate': parkrun['EventDate']})
                                 if event_data is not None:
                                     for edata in event_data:
                                         edata['EventID'] = eventID
                                         c.addParkrunEventPosition(edata)
-                                    logger.info("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['URL']))
+                                    logger.info("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
                                     eventsMissing -= 1 
                             else:
                                 logger.warning("Possible new event URL {}. Investigate and retry.".format(row[0][0].get('href')))
@@ -233,7 +233,7 @@ if __name__ == '__main__':
                     if not found:
                         print("Deleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
                         event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
-                        eventID = c.replaceParkrunEvent({'URL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
+                        eventID = c.replaceParkrunEvent({'EventURL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
                         if event_data is not None:
                             for edata in event_data:
                                 edata['EventID'] = eventID

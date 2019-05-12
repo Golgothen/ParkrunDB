@@ -110,7 +110,7 @@ class Connection():
             return self.cachedAgeCat[ageCat]
     
     def addParkrunEvent(self, parkrun):
-        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['URL'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
+        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(parkrun['EventURL'])) + ", " + str(parkrun['EventNumber']) + ", CAST('" + parkrun['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
 
     def replaceParkrunEvent(self, row):
         EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['EventURL'], row['EventNumber']))
