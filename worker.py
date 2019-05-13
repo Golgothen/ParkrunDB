@@ -40,6 +40,7 @@ class Worker(multiprocessing.Process):
         self.msgQ.put(Message('Process',self.id, 'Running'))
         while True:
             parkrun = self.inQ.get()
+            self.logger.debug(parkrun)
             if parkrun is None:
                 self.logger.info('Process {} Exiting'.format(self.id))
                 self.msgQ.put(Message('Process', self.id, 'Exiting'))
@@ -80,15 +81,15 @@ class Worker(multiprocessing.Process):
                     self.logger.debug('Event {} got {} events in history'.format(parkrun['URL'], len(data)))
                     for row in data:
                         row['Name'] = parkrun['Name']
-                        row['URL'] = parkrun['URL'].split('/')[3]
+                        row['EventURL'] = parkrun['EventURL']
                         # Add the event if it's a new event
                         self.msgQ.put(Message('Process', self.id, 'Checking ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                        #self.logger.debug(row)
-                        self.logger.debug('Process {} Checking {} event {}'.format(self.id, row['URL'], xstr(row['EventNumber'])))
+                        self.logger.debug(row)
+                        self.logger.debug('Process {} Checking {} event {}'.format(self.id, row['EventURL'], xstr(row['EventNumber'])))
                         # Check the event has the correct number of runners
                         if not c.checkParkrunEvent(row):
                             #if not, delete the old event record and re-import the data
-                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['URL'], row['EventNumber']))
+                            self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['EventURL'], row['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                             eventID = c.replaceParkrunEvent(row)
                             eData = self.getEvent(parkrun['URL'] + parkrun['EventNumberURL'], row['EventNumber'])
@@ -141,7 +142,7 @@ class Worker(multiprocessing.Process):
             if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
                 headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note','Strava']
         else:
-            headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
+            headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note'] #,'Strava']
         data = []
         
         for row in rows:
@@ -175,17 +176,17 @@ class Worker(multiprocessing.Process):
                         d['FirstName']=v.text.replace("'","''")
                         d['LastName']=None
                         d['AthleteID']=0
-                if h == 'Strava':
-                    if len(v.getchildren())>0:
-                        added = False
-                        for c in v.getchildren():
-                            if 'strava' in c.get('href'):
-                                d['StravaID']=c.get('href').split('/')[4]
-                                added = True
-                        if not added:
-                            d['StravaID']=None
-                    else:
-                        d['StravaID']=None
+                #if h == 'Strava':
+                #    if len(v.getchildren())>0:
+                #        added = False
+                #        for c in v.getchildren():
+                #            if 'strava' in c.get('href'):
+                #                d['StravaID']=c.get('href').split('/')[4]
+                #                added = True
+                #        if not added:
+                #            d['StravaID']=None
+                #    else:
+                #        d['StravaID']=None
                 if h == 'Age Cat':
                     if len(v.getchildren())>0:
                         d[h]=v.getchildren()[0].text

@@ -144,7 +144,9 @@ class Connection():
             return self.cachedClub[club]
             
     def addAthlete(self, athlete):
+        self.logger.debug(athlete)
         data = self.execute("SELECT AthleteID, FirstName, LastName, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = {}".format(athlete['AthleteID']))
+        self.logger.debug(data)
         if len(data) == 0:
             try:
                 sql = "INSERT INTO Athletes (AthleteID, FirstName, LastName, AgeCategoryID, Gender"
@@ -152,9 +154,9 @@ class Connection():
                 if athlete['Club'] is not None:
                     sql += ", ClubID"
                     values += ", " + xstr(self.getClub(athlete['Club']))
-                if athlete['StravaID'] is not None:
-                    sql += ", StravaID"
-                    values += ", '" + xstr(athlete['StravaID']) + "'"
+                #if athlete['StravaID'] is not None:
+                #    sql += ", StravaID"
+                #    values += ", '" + xstr(athlete['StravaID']) + "'"
                 sql += ")" + values + ")"
                 self.execute(sql)
             except pyodbc.Error as e:
@@ -169,12 +171,12 @@ class Connection():
                 if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete) or \
                    data[0]['ClubID'] != self.getClub(athlete['Club']) or \
                    data[0]['FirstName'][:50] != athlete['FirstName'][:50] or \
-                   data[0]['LastName'][:50] != athlete['LastName'][:50]:
+                   data[0]['LastName'][:50].upper() != xstr(athlete['LastName'][:50].upper()):
                     self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete)) + \
                                  ", ClubID = " + xstr(self.getClub(athlete['Club'])) + \
-                                 ", FirstName = '" + athlete['FirstName'][:50] + "'" + \
-                                 ", LastName = '" + athlete['LastName'][:50] + "'" + \
-                                 " WHERE AthleteID = " + str(athlete['AthleteID']))
+                                 ", FirstName = '" + xstr(athlete['FirstName'][:50]) + "'" + \
+                                 ", LastName = '" + xstr(athlete['LastName'][:50]) + "'" + \
+                                 " WHERE AthleteID = " + xstr(athlete['AthleteID']))
             
     def addParkrunEventPosition(self, position, addAthlete = True):
         if addAthlete:

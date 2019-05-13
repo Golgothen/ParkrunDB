@@ -38,15 +38,15 @@ def getURL(url):
     return temp 
 
 def getEvent(url, parkrunEvent):
-    #self.logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
+    logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
     html = getURL(url + str(parkrunEvent))
     #Test if we got a valid response'
     if html is None:  #most likely a 404 error
-        #self.logger.warning('Error retrieving event')
+        logger.warning('Error retrieving event')
         #self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
         return None
     if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
-        #self.logger.warning('Error retrieving event')
+        logger.warning('Error retrieving event')
         #self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
         return None
     html = '<table' + html.split('<table')[1].split('</p>')[0]
@@ -60,9 +60,9 @@ def getEventTable(tableHTML):
     
     if len(rows) > 0:
         if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
-            headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note','Strava']
+            headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note',] #'Strava']
     else:
-        headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
+        headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note']
     data = []
     
     for row in rows:
@@ -90,23 +90,23 @@ def getEventTable(tableHTML):
                     if lastName != '':
                         d['LastName'] = lastName.strip()
                     else:
-                        d['LastName'] = None
+                        d['LastName'] = ''
                     d['AthleteID']=int(v.getchildren()[0].get('href').split('=')[1])
                 else:
                     d['FirstName']=v.text.replace("'","''")
                     d['LastName']=None
                     d['AthleteID']=0
-            if h == 'Strava':
-                if len(v.getchildren())>0:
-                    added = False
-                    for c in v.getchildren():
-                        if 'strava' in c.get('href'):
-                            d['StravaID']=c.get('href').split('/')[4]
-                            added = True
-                    if not added:
-                        d['StravaID']=None
-                else:
-                    d['StravaID']=None
+            #if h == 'Strava':
+            #    if len(v.getchildren())>0:
+            #        added = False
+            #        for c in v.getchildren():
+            #            if 'strava' in c.get('href'):
+            #                d['StravaID']=c.get('href').split('/')[4]
+            #                added = True
+            #        if not added:
+            #            d['StravaID']=None
+            #    else:
+            #        d['StravaID']=None
             if h == 'Age Cat':
                 if len(v.getchildren())>0:
                     d[h]=v.getchildren()[0].text
@@ -156,16 +156,17 @@ if __name__ == '__main__':
         html = getURL(baseURL.format(athlete['AthleteID']))
         try:
             runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
+            logger.debug("Runcount = {}".format(runcount))
         except (ValueError, IndexError, AttributeError):
             print("Error reading run count for Athlete {}".format(athlete['AthleteID']))
             logger.warning("Error reading run count for Athlete {}".format(athlete['AthleteID']))
             continue
         if athlete['EventCount'] != runcount:
             eventsMissing = runcount - athlete['EventCount']
-            rows = rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
+            rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
             hist_data = c.execute("SELECT * FROM getAthleteEventHistory({})".format(athlete['AthleteID']))
             if eventsMissing > 0:
-                logger.debug("Athlete {} Missing {} runs".format(athlete['AthleteID'], eventsMissing))
+                logger.info("Athlete {} Missing {} runs".format(athlete['AthleteID'], eventsMissing))
                 for row in rows:  # Iterate through the events in the summary table
                     parkrun = {}
                     position = {}
@@ -185,21 +186,21 @@ if __name__ == '__main__':
                         position['Age Grade'] = row[5].text[:-1]
                         position['Note'] = None
                     except TypeError:
-                        print("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['URL'], parkrun['EventNumber'], athlete['AthleteID']))
-                        logger.warning("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['URL'], parkrun['EventNumber'], athlete['AthleteID']))
+                        print("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['EventURL'], parkrun['EventNumber'], athlete['AthleteID']))
+                        logger.warning("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['EventURL'], parkrun['EventNumber'], athlete['AthleteID']))
                         continue
-                    #logger.debug(parkrun['URL'])
-                    #logger.debug(position)
+                    logger.debug(parkrun)
+                    logger.debug(position)
                     found = False
                     for d in hist_data:
                         if d['URL'] == parkrun['EventURL'] and d['EventNumber'] == parkrun['EventNumber']:
                             found = True
                             break
                     if not found:
-                        logger.debug("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
+                        logger.info("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
                         parkrunType = c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun['EventURL']))
                         if parkrunType == 'Special':
-                            logger.debug("Special Event detected")
+                            logger.info("Special Event detected")
                             position['EventID'] = c.execute("SELECT dbo.getEventID('{}',{})".format(parkrun['EventURL'], parkrun['EventNumber']))
                             if position['EventID'] is None:
                                 position['EventID'] = c.addParkrunEvent(parkrun)
