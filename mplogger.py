@@ -16,7 +16,7 @@ sender_config = {
             'level':       'INFO',
         },
         'checkhistory': {
-            'level':       'INFO',
+            'level':       'WARNING',
         },
         'worker': {
             'level':       'INFO',

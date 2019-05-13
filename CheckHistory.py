@@ -4,6 +4,7 @@ from dbconnection import Connection
 from urllib.request import urlopen, Request #, localhost
 from urllib.error import HTTPError
 from time import sleep
+from timeit import default_timer as timer
 
 #from parkrunlist import ParkrunList
 #from worker import *
@@ -232,7 +233,7 @@ if __name__ == '__main__':
                             found = True
                             break
                     if not found:
-                        print("Deleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
+                        logger.info("Deleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
                         event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
                         eventID = c.replaceParkrunEvent({'EventURL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
                         if event_data is not None:
@@ -246,7 +247,12 @@ if __name__ == '__main__':
                     logger.info("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
         else:
             c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
-            logger.info("Athlete {} {} ({}), {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['EventCount'], athlete['AthleteID']))
-        sleep(2)
+            logger.warning("Athlete {} {} ({}), {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['EventCount'], athlete['AthleteID']))
+        tick = timer()
+        stats = c.execute("SELECT * FROM getAthleteCheckProgress(40)")[0]
+        print('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete.'.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete']))
+        t = 2 - (timer() - tick)
+        if t > 0:
+            sleep(t)
     listener.stop()
     
