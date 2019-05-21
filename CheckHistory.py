@@ -8,7 +8,7 @@ from timeit import default_timer as timer
 from parkrunlist import ParkrunList
 from worker import *
 
-import logging, logging.config, multiprocessing, lxml.html
+import logging, logging.config, multiprocessing, lxml.html, argparse
 
 intervals = (
     ('weeks', 604800),  # 60 * 60 * 24 * 7
@@ -18,7 +18,7 @@ intervals = (
     ('seconds', 1),
     )
 
-def display_time(seconds, granularity=2):
+def display_time(seconds, granularity=4):
     result = []
 
     for name, count in intervals:
@@ -166,7 +166,21 @@ if __name__ == '__main__':
     logger = logging.getLogger('checkhistory')
 
     c = Connection(config)
-    data = c.execute("select * from getAthleteCheckHistoryList(40) ORDER BY EventCount DESC, NextCheckDate, HistoryLastChecked DESC, AthleteID")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--limit', type = int, default = 40, help = 'Specify number of events and athlete needs to have completed to be selected.')
+    parser.add_argument('--delay', type = int, default = 5, help = 'Wait n seconds before processing the next athlete')
+    
+    args = parser.parse_args()
+    
+    logger.debug(args)
+    
+    limit = args.limit
+    delay = args.delay
+    
+    
+    
+    data = c.execute("select * from getAthleteCheckHistoryList({}) ORDER BY EventCount DESC, NextCheckDate, HistoryLastChecked DESC, AthleteID".format(limit))
     baseURL = "http://www.parkrun.com.au/results/athleteeventresultshistory/?athleteNumber={}&eventNumber=0"
     counter = 0
     start = timer()
@@ -179,13 +193,14 @@ if __name__ == '__main__':
     
     try:
         for athlete in data:
+            tick = timer()
             while not outQ.empty():
                 logger.info(outQ.get(False))
-            athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCountWithoutJuniors({})".format(athlete['AthleteID']))
+            athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
             logger.debug("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
             html = getURL(baseURL.format(athlete['AthleteID']))
             try:
-                runcount = int(html.split('<h2>')[1].split('<br/>')[1].split(' parkruns')[0])
+                runcount = int(html.split('<h2>')[1].split('<br/>')[0].split(' runs at All Events')[0].split(' ')[-1])
                 logger.debug("Runcount = {}".format(runcount))
             except (ValueError, IndexError, AttributeError):
                 print("Error reading run count for Athlete {}".format(athlete['AthleteID']))
@@ -248,6 +263,7 @@ if __name__ == '__main__':
                                             edata['EventID'] = eventID
                                             c.addParkrunEventPosition(edata)
                                         logger.info("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
+                                        sleep(8)
                                         eventsMissing -= 1 
                                 else:
                                     parkrun['RegionID'] = c.execute("SELECT dbo.getDefaultRegionID('{}')".format(parkrun['CountryURL']))
@@ -295,19 +311,24 @@ if __name__ == '__main__':
             else:
                 c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
                 logger.warning("Athlete {} {} ({}), {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['EventCount'], athlete['AthleteID']))
-            tick = timer()
             counter += 1
             if counter % 10 == 0:
                 rate = (counter / ((timer() - start)/60))
-                stats = c.execute("SELECT * FROM getAthleteCheckProgress(40)")[0]
+                stats = c.execute("SELECT * FROM getAthleteCheckProgress({})".format(limit))[0]
                 print('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete, {:4.1f} athletes/minute, ETC in {} '.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete'],rate, display_time(int((stats['AthleteCount']-stats['CheckedAthlete'])/rate*60))))
-                logger.info('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete.'.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete']))
-                print('{} events pending download.'.format(inQ.qsize()))
+                #logger.info('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete.'.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete']))
+                #print('{} events pending download.'.format(inQ.qsize()))
                 logger.info('{} events pending download.'.format(inQ.qsize()))
-                #counter = 0
-            t = 2 - (timer() - tick)
+                counter = 0
+                start = timer()
+            t = delay - (timer() - tick)
             if t > 0:
                 sleep(t)
+        inQ.put(None)
+        worker.join()
+        while not outQ.empty():
+            outQ.get(False)
+        listener.stop()
     except (KeyboardInterrupt, SystemExit):
         inQ.put(None)
         worker.join()

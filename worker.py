@@ -1,7 +1,7 @@
-import multiprocessing
+import multiprocessing, lxml.html, logging, logging.config, signal #, os
+
 from urllib.request import urlopen, Request #, localhost
 from urllib.error import HTTPError
-import lxml.html, logging, logging.config #, os
 from time import sleep
 from dbconnection import Connection
 from datetime import datetime
@@ -31,6 +31,7 @@ class Worker(multiprocessing.Process):
         self.config = config
         self.delay = delay
         #self.loggingQueue = loggingQueue
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         
     def run(self):
         c = Connection(self.config)
