@@ -1,8 +1,11 @@
 import lxml.html
 from urllib.request import urlopen, Request #, localhost
+from urllib.error import HTTPError
 from dbconnection import Connection
 from mplogger import *
 import multiprocessing
+from datetime import datetime
+import pyodbc
 
 
 def getURL(url):
@@ -19,7 +22,8 @@ def getURL(url):
                 return None
             if e.code == 403:
                 #self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
-                return None
+                raise
+                #return None
             #self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
             sleep(1)
         except:
@@ -33,26 +37,28 @@ def getURL(url):
 if __name__ == '__main__':
 
     loggingQueue = multiprocessing.Queue()
-
+    
     listener = LogListener(loggingQueue)
     listener.start()
     
     config = sender_config
     config['handlers']['queue']['queue'] = loggingQueue
     logging.config.dictConfig(config)
-    logger = logging.getLogger('checkhistory')
-
+    logger = logging.getLogger('parkruncalendar')
+    
     c = Connection(config)
-
+    logger.debug("Reading Parkrun Calendar")
     table = lxml.html.fromstring(getURL('https://email.parkrun.com/t/i-l-pmttz-ntrktsur-m/')).xpath('/html/body/section[1]/div/div[1]/div[1]/div/div[4]')[0]
+    logger.debug("Parkrun Calendar read")
     lists = {}
     
     for e in table:
         if e.tag == 'h3':
             currentlist = e.getchildren()[0].text
-            if currentlist == 'Cancellations':
-                break
             lists[currentlist] = []
+            if currentlist == 'Cancellations':
+                logger.debug("Launches and Anniversaries processed")
+                break
         if e.tag == 'p':
             if len(e.getchildren()) > 0:
                 if e.getchildren()[0].tag == 'span':
@@ -64,21 +70,29 @@ if __name__ == '__main__':
                         currentdate = e.getchildren()[0].text[:-2]
                 if e.getchildren()[0].tag == 'a':
                     event = e.getchildren()[0].text.split(' (')[0]
-                    lists[currentlist].append(((datetime.datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.datetime.now().year),'%B %d %Y')),event))
+                    lists[currentlist].append(((datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')),event))
             else:
                 #print( list(map(str.strip, e.text.replace('\xa0','').split(','))))
-                for x in [x.split(' (')[0] for x in list(map(str.strip, e.text.replace('\xa0','').split(',')))]:
-                    lists[currentlist].append(( (datetime.datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.datetime.now().year),'%B %d %Y')), (x)))
+                for x in [x.split('(')[0].strip() for x in list(map(str.strip, e.text.replace('\xa0','').split(',')))]:
+                    lists[currentlist].append(( (datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')), (x)))
     
+    logger.debug("Reading Parkrun Cancellations")
     table = lxml.html.fromstring(getURL('https://www.parkrun.com.au/cancellations/')).xpath('//*[@id="content"]/div[1]')[0]
+    logger.debug("Parkrun Cancellations read")
     for e in table:
         if e.tag == 'h1':
             if len(e.getchildren()) == 0:
-                currentdate = datetime.datetime.strptime(e.text,'%Y-%m-%d')
+                currentdate = datetime.strptime(e.text,'%Y-%m-%d')
         if e.tag == 'ul':
             for li in e.getchildren():
                 lists['Cancellations'].append((currentdate,li.getchildren()[0].text[:-8]))
-            
+    
+    logger.debug("Parkrun Cancellations processed")
+    count = 0
     for l in lists:
-        for i in l:
-            c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), {})".format())
+        for i in lists[l]:
+            if len(c.execute("SELECT * FROM ParkrunCalendar WHERE ParkrunID = dbo.getParkrunID('{}') AND CalendarID = dbo.getCalendarID('{}') AND CalendarDate = '{}'".format(i[1], l, i[0].strftime('%Y-%m-%d')))) == 0:
+                count += 1
+                c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), '{}')".format(i[1], l, i[0].strftime('%Y-%m-%d')))
+    logger.debug("Database updated. {} records added.".format(count))
+    listener.stop()

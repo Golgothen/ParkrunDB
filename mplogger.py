@@ -24,6 +24,9 @@ sender_config = {
         'parkrunlist': {
             'level':       'INFO',
         },
+        'parkruncalendar': {
+            'level':       'INFO',
+        },
         'dbconnection': {
             'level':       'INFO',
         },
@@ -41,7 +44,7 @@ listener_config = {
     'formatters': {
         'detailed': {
             'class':       'logging.Formatter',
-            'format':      '%(asctime)-16s:%(name)-21s:%(processName)-15s:%(levelname)-8s[%(module)-13s.%(funcName)-20s %(lineno)-5s] %(message)s'
+            'format':      '%(asctime)-16s:%(name)-21s:%(processName)-15s:%(levelname)-8s[%(module)-16s.%(funcName)-20s %(lineno)-5s] %(message)s'
             },
         'brief': {
             'class':       'logging.Formatter',
