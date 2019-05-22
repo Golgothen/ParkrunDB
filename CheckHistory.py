@@ -34,11 +34,11 @@ def getURL(url):
     completed = False
     while not completed:
         try:
-            #logger.debug('Hitting {}'.format(url))
+            logger.debug('Hitting {}'.format(url))
             f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'}))
             completed = True
         except HTTPError as e:
-            #logger.warning('Got HTTP Error {}'.format(e.code))
+            logger.warning('Got HTTP Error {}'.format(e.code))
             if e.code == 404:
                 #self.msgQ.put(Message('Error',self.id, 'Bad URL ' + url))
                 return None
@@ -49,11 +49,11 @@ def getURL(url):
             #self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
             sleep(1)
         except:
-            #logger.warning('Unexpected network error. URL: ' + url)
+            logger.warning('Unexpected network error. URL: ' + url)
             #self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
             return None
     temp = f.read().decode('utf-8', errors='ignore')
-    #logger.debug('URL returned string of length {}'.format(len(temp)))
+    logger.debug('URL returned string of length {}'.format(len(temp)))
     return temp 
 
 def getEvent(url, parkrunEvent):
@@ -263,7 +263,7 @@ if __name__ == '__main__':
                                             edata['EventID'] = eventID
                                             c.addParkrunEventPosition(edata)
                                         logger.info("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
-                                        sleep(8)
+                                        sleep(10)
                                         eventsMissing -= 1 
                                 else:
                                     parkrun['RegionID'] = c.execute("SELECT dbo.getDefaultRegionID('{}')".format(parkrun['CountryURL']))
@@ -305,6 +305,7 @@ if __name__ == '__main__':
                                     c.addParkrunEventPosition(edata)
                                 logger.info("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['URL']))
                                 eventsMissing += 1
+                            sleep(10)
                     if eventsMissing == 0:
                         #c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
                         logger.info("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
