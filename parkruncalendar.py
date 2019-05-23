@@ -94,5 +94,5 @@ if __name__ == '__main__':
             if len(c.execute("SELECT * FROM ParkrunCalendar WHERE ParkrunID = dbo.getParkrunID('{}') AND CalendarID = dbo.getCalendarID('{}') AND CalendarDate = '{}'".format(i[1], l, i[0].strftime('%Y-%m-%d')))) == 0:
                 count += 1
                 c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), '{}')".format(i[1], l, i[0].strftime('%Y-%m-%d')))
-    logger.debug("Database updated. {} records added.".format(count))
+    logger.info("Database updated. {} records added.".format(count))
     listener.stop()
