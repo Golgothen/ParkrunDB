@@ -296,7 +296,7 @@ if __name__ == '__main__':
                                 found = True
                                 break
                         if not found:
-                            logger.info("Deleted event {} for parkrun {}".format(d['EventNumber'], d['ParkrunName']))
+                            logger.info("Deleted event {} for parkrun {} for athlete {} {} ({})".format(d['EventNumber'], d['ParkrunName'],athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
                             event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
                             eventID = c.replaceParkrunEvent({'EventURL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
                             if event_data is not None:
