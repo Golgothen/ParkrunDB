@@ -195,7 +195,7 @@ if __name__ == '__main__':
         for athlete in data:
             tick = timer()
             while not outQ.empty():
-                logger.info(outQ.get(False))
+                logger.debug(outQ.get(False))
             athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
             logger.debug("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
             html = getURL(baseURL.format(athlete['AthleteID']))
@@ -211,7 +211,7 @@ if __name__ == '__main__':
                 rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
                 hist_data = c.execute("SELECT * FROM getAthleteEventHistory({})".format(athlete['AthleteID']))
                 if eventsMissing > 0:
-                    logger.info("Athlete {} Missing {} runs".format(athlete['AthleteID'], eventsMissing))
+                    logger.debug("Athlete {} Missing {} runs".format(athlete['AthleteID'], eventsMissing))
                     for row in rows:  # Iterate through the events in the summary table
                         parkrun = {}
                         position = {}
@@ -245,10 +245,10 @@ if __name__ == '__main__':
                                 found = True
                                 break
                         if not found:
-                            logger.info("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
+                            logger.debug("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
                             parkrunType = c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun['EventURL']))
                             if parkrunType == 'Special':
-                                logger.info("Special Event detected")
+                                logger.debug("Special Event detected")
                                 position['EventID'] = c.execute("SELECT dbo.getEventID('{}',{})".format(parkrun['EventURL'], parkrun['EventNumber']))
                                 if position['EventID'] is None:
                                     position['EventID'] = c.addParkrunEvent(parkrun)
@@ -262,7 +262,7 @@ if __name__ == '__main__':
                                         for edata in event_data:
                                             edata['EventID'] = eventID
                                             c.addParkrunEventPosition(edata)
-                                        logger.info("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
+                                        logger.debug("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
                                         sleep(10)
                                         eventsMissing -= 1 
                                 else:
@@ -275,7 +275,7 @@ if __name__ == '__main__':
                                     p = c.execute("select dbo.getParkrunID('{}')".format(parkrun['EventURL']))
                                     if p is None:    
                                         c.execute("INSERT INTO Parkruns (RegionID, ParkrunName, URL, LaunchDate, ParkrunTypeID) VALUES ({}, '{}', '{}', '19000101', {})".format(parkrun['RegionID'], parkrun['Name'], parkrun['EventURL'], (lambda x: 2 if x else 1)(parkrun['Juniors'])))
-                                        logger.warning("Added new event {}.".format(row[0][0].get('href')))
+                                        logger.info("Added new event {}.".format(row[0][0].get('href')))
                                         l = ParkrunList(config, Mode.NORMAL)
                                         l.events(parkrun['EventURL'], True)
                                         for p in l:
@@ -296,14 +296,14 @@ if __name__ == '__main__':
                                 found = True
                                 break
                         if not found:
-                            logger.info("Deleted event {} for parkrun {} for athlete {} {} ({})".format(d['EventNumber'], d['ParkrunName'],athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
+                            logger.debug("Deleted event {} for parkrun {} for athlete {} {} ({})".format(d['EventNumber'], d['ParkrunName'],athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
                             event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
                             eventID = c.replaceParkrunEvent({'EventURL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
                             if event_data is not None:
                                 for edata in event_data:
                                     edata['EventID'] = eventID
                                     c.addParkrunEventPosition(edata)
-                                logger.info("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['URL']))
+                                logger.debug("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['URL']))
                                 eventsMissing += 1
                             sleep(10)
                     if eventsMissing == 0:
@@ -311,15 +311,15 @@ if __name__ == '__main__':
                         logger.info("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
             else:
                 c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
-                logger.warning("Athlete {} {} ({}), {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['EventCount'], athlete['AthleteID']))
+                logger.info("Athlete {} {} ({}), {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['EventCount'], athlete['AthleteID']))
             counter += 1
             if counter % 10 == 0:
                 rate = (counter / ((timer() - start)/60))
                 stats = c.execute("SELECT * FROM getAthleteCheckProgress({})".format(limit))[0]
                 print('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete, {:4.1f} athletes/minute, ETC in {} '.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete'],rate, display_time(int((stats['AthleteCount']-stats['CheckedAthlete'])/rate*60))))
-                #logger.info('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete.'.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete']))
+                #logger.debug('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete.'.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete']))
                 #print('{} events pending download.'.format(inQ.qsize()))
-                logger.info('{} events pending download.'.format(inQ.qsize()))
+                logger.debug('{} events pending download.'.format(inQ.qsize()))
                 counter = 0
                 start = timer()
             t = delay - (timer() - tick)
