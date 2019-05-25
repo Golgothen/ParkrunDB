@@ -77,6 +77,12 @@ listener_config = {
     },
 }
 
+#TRACE_LEVEL_NUM = 5 
+#logging.addLevelName(TRACE_LEVEL_NUM, "TRACE")
+#def trace(self, message, *args, **kws):
+#    # Yes, logger takes its '*args' as 'args'.
+#    self._log(TRACE_LEVEL_NUM, message, args, **kws) 
+#logging.Logger.trace = trace
 
 class MyHandler(object):
     def handle(self, record):
