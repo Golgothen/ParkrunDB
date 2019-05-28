@@ -57,10 +57,12 @@ class Worker(multiprocessing.Process):
                     self.msgQ.put(Message('Error', self.id, 'Could not verify ' + parkrun['Name'] + ' as valid'))
             
             if self.mode == Mode.NEWEVENTS:
+                runnersAdded = False
                 self.logger.info('Process {} checking for new results for {}'.format(self.id, parkrun['EventURL']))
                 self.msgQ.put(Message('Process', self.id, 'Checking for new results for ' + parkrun['Name'] ))
                 parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['URL'] + parkrun['LatestResultsURL'])
                 if data is not None:
+                    runnersAdded = True
                     self.logger.debug('Event {} got {} events in history'.format(parkrun['EventURL'], len(data)))
                     parkrun['Runners'] = len(data)
                     # Add the event if it's a new event
@@ -77,6 +79,7 @@ class Worker(multiprocessing.Process):
                         sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
+                runnersAdded = False
                 data = self.getEventHistory(parkrun['URL'] + parkrun['EventHistoryURL'])
                 if data is not None:
                     self.logger.debug('Event {} got {} events in history'.format(parkrun['URL'], len(data)))
@@ -95,6 +98,7 @@ class Worker(multiprocessing.Process):
                             eventID = c.replaceParkrunEvent(row)
                             eData = self.getEvent(parkrun['URL'] + parkrun['EventNumberURL'], row['EventNumber'])
                             if eData is not None:
+                                runnersAdded = True
                                 self.logger.debug('getEvent found {} runners'.format(len(eData)))
                                 for eRow in eData:
                                     eRow['EventID'] = eventID
@@ -104,7 +108,8 @@ class Worker(multiprocessing.Process):
                                 self.logger.debug('getEvent found no runners')
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
-            c.execute("update p set p.LastUpdated = e.LastEvent from parkruns as p inner join (select ParkrunID, max(EventDate) as LastEvent from events group by ParkrunID) as e on p.ParkrunID = e.ParkrunID")
+            if runnersAdded:
+                c.execute("update p set p.LastUpdated = e.LastEvent from parkruns as p inner join (select ParkrunID, max(EventDate) as LastEvent from events group by ParkrunID) as e on p.ParkrunID = e.ParkrunID")
             self.logger.debug('Sleeping for {} seconds'.format(self.delay))
             sleep(self.delay)
         c.close()
@@ -132,16 +137,19 @@ class Worker(multiprocessing.Process):
                 return None
         temp = f.read().decode('utf-8', errors='ignore')
         self.logger.debug('URL returned string of length {}'.format(len(temp)))
-        return temp 
+        return lxml.html.fromstring(temp) 
     
-    def getEventTable(self, tableHTML):
-        headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note','Strava']
+    def getEventTable(self, root):
         
-        rows = tableHTML.xpath('//tbody/tr')
+        table = root.xpath('//*[@id="results"]')
+        
+        headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note',] #'Strava']
+        
+        rows = table.xpath('//tbody/tr')
         
         if len(rows) > 0:
             if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
-                headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note','Strava']
+                headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note']#,'Strava']
         else:
             headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note'] #,'Strava']
         data = []
@@ -212,40 +220,40 @@ class Worker(multiprocessing.Process):
                 data = sorted(data, key=lambda k: '0:00:00' if k['Time'] is None else k['Time'])
                 for i in range(len(data)):
                     data[i]['Pos'] = i + 1
-        return data
+            return data
+        else:
+            return None
     
     def getEvent(self, url, parkrunEvent):
         self.logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
-        html = self.getURL(url + str(parkrunEvent))
+        root = self.getURL(url + str(parkrunEvent))
         #Test if we got a valid response'
-        if html is None:  #most likely a 404 error
+        if root is None:  #most likely a 404 error
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
             return None
-        if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+        if len(root.xpath('//*[@id="content"]/h1')) == 0:
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
             return None
-        html = '<table' + html.split('<table')[1]
-        html = html.split('</p>')[0]
-        table = lxml.html.fromstring(html)
         return self.getEventTable(table)
     
     def getLatestEvent(self, url):
         self.logger.debug('Hitting {}'.format(url))
-        html = self.getURL(url)
-        #Test if we got a valid response'
-        if html is None:  #most likely a 404 error
+        root = self.getURL(url)
+        
+        #Test if we got a valid response
+        if root is None:  #most likely a 404 error
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
             return 0, None, None
-        if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+        if len(root.xpath('//*[@id="content"]/h1')) > 0:
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
             return 0, None, None
+        
         try:
-            eventHTML = html.split('<h2>')[1]
-            eventHTML = eventHTML.split('</h2>')[0]
+            eventHTML = root.xpath('//*[@id="content"]/h2')[0].text
         except IndexError:
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible page error retrieving url ' + url))
@@ -256,29 +264,28 @@ class Worker(multiprocessing.Process):
         eventNumber =  int(eventHTML.split('#')[1].split('-')[0].strip())
         eventDate = datetime.strptime(eventHTML[len(eventHTML)-10:],'%d/%m/%Y')
         
-        html = '<table' + html.split('<table')[1]
-        html = html.split('</p>')[0]
-        table = lxml.html.fromstring(html)
-        return eventNumber, eventDate, self.getEventTable(table)
+        return eventNumber, eventDate, self.getEventTable(root)
+    
+    
     
         
     def getEventHistory(self, url):
         self.logger.debug('Hitting {}'.format(url))
-        html = self.getURL(url)
-        #Test if we got a valid response'
-        if html is None:  #most likely a 404 error
+        root = self.getURL(url)
+        
+        #Test if we got a valid response
+        if root is None:  #most likely a 404 error
             self.logger.warning('Error retrieving event. URL: ' + url)
-            self.msgQ.put(Message('Error', self.id, 'Possible 404 error gettint event history. Check url ' + url))
+            self.msgQ.put(Message('Error', self.id, 'Possible 404 error getting event history. Check url ' + url))
             return None
-        if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:    
+
+        if len(root.xpath('//*[@id="content"]/h1')) > 0:
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'URL error in event history. Check ' + url))
             return None
-        html = '<table' + html.split('<table')[1]
-        html = html.split('<div')[0]
-        table = lxml.html.fromstring(html)
-        
-        headings = ['EventNumber','EventDate','Runners']    
+
+        table = root.xpath('//*[@id="results"]')[0]
+        headings = ['EventNumber','EventDate','Runners','Volunteers']    
         rows = table.xpath('//tbody/tr')
         
         data = []
@@ -287,7 +294,7 @@ class Worker(multiprocessing.Process):
             for h, v in zip(headings, row.getchildren()):
                 if h == 'EventNumber':
                     d[h] = int(v.getchildren()[0].text)
-                if h == 'Runners':
+                if h in ['Runners','Volunteers']:
                     d[h] = int(v.text)
                 if h == 'EventDate':
                     d[h] = datetime.strptime(v.getchildren()[0].text,"%d/%m/%Y")
