@@ -141,7 +141,7 @@ class Worker(multiprocessing.Process):
     
     def getEventTable(self, root):
         
-        table = root.xpath('//*[@id="results"]')
+        table = root.xpath('//*[@id="results"]')[0]
         
         headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note',] #'Strava']
         
