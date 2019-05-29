@@ -236,7 +236,7 @@ class Worker(multiprocessing.Process):
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
             return None
-        return self.getEventTable(table)
+        return self.getEventTable(root)
     
     def getLatestEvent(self, url):
         self.logger.debug('Hitting {}'.format(url))
@@ -265,10 +265,7 @@ class Worker(multiprocessing.Process):
         eventDate = datetime.strptime(eventHTML[len(eventHTML)-10:],'%d/%m/%Y')
         
         return eventNumber, eventDate, self.getEventTable(root)
-    
-    
-    
-        
+
     def getEventHistory(self, url):
         self.logger.debug('Hitting {}'.format(url))
         root = self.getURL(url)
