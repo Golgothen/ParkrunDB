@@ -227,15 +227,18 @@ class Worker(multiprocessing.Process):
     def getEvent(self, url, parkrunEvent):
         self.logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
         root = self.getURL(url + str(parkrunEvent))
+        self.logger.debug(root)
         #Test if we got a valid response'
         if root is None:  #most likely a 404 error
             self.logger.warning('Error retrieving event')
-            self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
+            self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url + str(parkrunEvent)))
             return None
-        if len(root.xpath('//*[@id="content"]/h1')) == 0:
+        self.logger.debug('GetURL did not return None')
+        if len(root.xpath('//*[@id="content"]/h1')) > 0:
             self.logger.warning('Error retrieving event')
-            self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
+            self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url + str(parkrunEvent)))
             return None
+        self.logger.debug('GetURL did not return an error page')
         return self.getEventTable(root)
     
     def getLatestEvent(self, url):
