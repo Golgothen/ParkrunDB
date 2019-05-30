@@ -300,4 +300,19 @@ class Worker(multiprocessing.Process):
                     d[h] = datetime.strptime(v.getchildren()[0].text,"%d/%m/%Y")
             data.insert(0,d)
         return data
-
+    
+    def getVolunteers(self, root):
+        volunteerNames = [x.strip() for x in root.xpath('//*[@id="content"]/div[2]/p[1]')[0].text.split(':')[1].split(',')]
+        volunteers = []
+        parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
+        results = self.getEventTable(root)
+        if self.c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
+            for v in volunteerNames:
+                volunteers.append(self.c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(v.split()[0],v.split()[1],parkrun))[0])
+            
+            # Locate the tail walker
+            for v in volunteers:
+                try:
+                    tailwalker = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                except StopIteration:
+                    continue
