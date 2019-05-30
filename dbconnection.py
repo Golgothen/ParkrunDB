@@ -18,6 +18,7 @@ class Connection():
         self.cachedAgeCat = None
         #self.cachedAthlete = None
         self.cachedClub = None
+        self.cachedVolunteer = None
         self.config = config
         logging.config.dictConfig(config)
         self.logger = logging.getLogger(__name__)
@@ -142,6 +143,21 @@ class Connection():
             return c_id
         else:
             return self.cachedClub[club]
+            
+    def getVolunteer(self, volunteer):
+        if self.cachedVolunteer is None:
+            data = self.execute("SELECT VolunteerPositionID, VolunteerPosition from VolunteerPositions")
+            self.cachedVolunteer = {}
+            for row in data:
+                self.cachedVolunteer[row['VolunteerPosition']] = row['VolunteerPositionID']
+            self.logger.debug('Added {} records to Volunteer Position cache'.format(len(self.cachedVolunteer))) 
+        if volunteer is None: return None
+        if volunteer not in self.cachedClub:
+            c_id = self.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('" + volunteer + "')")
+            self.cachedVolunteer[volunteer] = c_id
+            return c_id
+        else:
+            return self.cachedVolunteer[volunteer]
             
     def addAthlete(self, athlete):
         self.logger.debug(athlete)
