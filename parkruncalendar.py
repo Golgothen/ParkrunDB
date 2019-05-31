@@ -82,13 +82,26 @@ if __name__ == '__main__':
     logger.debug("Reading Parkrun Cancellations")
     table = lxml.html.fromstring(getURL('https://www.parkrun.com.au/cancellations/')).xpath('//*[@id="content"]/div[1]')[0]
     logger.debug("Parkrun Cancellations read")
+    
+    ulcount = 0
+    licount = 0
+    
     for e in table:
         if e.tag == 'h1':
             if len(e.getchildren()) == 0:
                 currentdate = datetime.strptime(e.text,'%Y-%m-%d')
         if e.tag == 'ul':
-            for li in e.getchildren():
-                lists['Cancellation'].append((currentdate,li.getchildren()[0].text[:-8]))#,li.text.split(':').strip())
+            ulcount += 1
+            licount = 0
+            if len(e.getchildren()) > 1:
+                for li in e.getchildren():
+                    licount += 1
+                    lists['Cancellation'].append((currentdate,li.getchildren()[0].text[:-8],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li[{}]/text()'.format(ulcount,licount))[0].split(':')[1].strip()))
+                    #print((currentdate,li.getchildren()[0].text[:-8]),table.xpath('//*[@id="content"]/div[1]/ul[{}]/li[{}]/text()'.format(ulcount,licount))[0])
+            else:
+                lists['Cancellation'].append((currentdate,e.getchildren()[0].getchildren()[0].text[:-8],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li/text()'.format(ulcount))[0].split(':')[1].strip()))
+                #print((currentdate,e.getchildren()[0].getchildren()[0].text[:-8]),table.xpath('//*[@id="content"]/div[1]/ul[{}]/li/text()'.format(ulcount))[0])
+            
     
     logger.debug("Parkrun Cancellations processed")
     count = 0
@@ -96,6 +109,6 @@ if __name__ == '__main__':
         for i in lists[l]:
             if len(c.execute("SELECT * FROM ParkrunCalendar WHERE ParkrunID = dbo.getParkrunID('{}') AND CalendarID = dbo.getCalendarID('{}') AND CalendarDate = '{}'".format(i[1], l, i[0].strftime('%Y-%m-%d')))) == 0:
                 count += 1
-                c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), '{}')".format(i[1], l, i[0].strftime('%Y-%m-%d')))
+                c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate, Notes) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), '{}', '{}')".format(i[1], l, i[0].strftime('%Y-%m-%d'),i[2]))
     logger.info("Database updated. {} records added.".format(count))
     listener.stop()
