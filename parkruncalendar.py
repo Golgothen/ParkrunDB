@@ -55,8 +55,11 @@ if __name__ == '__main__':
     for e in table:
         if e.tag == 'h3':
             currentlist = e.getchildren()[0].text
+            if currentlist == 'Cancellations': currentlist = 'Cancellation'
+            if currentlist == 'Anniversaries': currentlist = 'Anniversary'
+            if currentlist == 'Launches': currentlist = 'Launch'
             lists[currentlist] = []
-            if currentlist == 'Cancellations':
+            if currentlist == 'Cancellation':
                 logger.debug("Launches and Anniversaries processed")
                 break
         if e.tag == 'p':
@@ -85,7 +88,7 @@ if __name__ == '__main__':
                 currentdate = datetime.strptime(e.text,'%Y-%m-%d')
         if e.tag == 'ul':
             for li in e.getchildren():
-                lists['Cancellations'].append((currentdate,li.getchildren()[0].text[:-8]))
+                lists['Cancellation'].append((currentdate,li.getchildren()[0].text[:-8]))#,li.text.split(':').strip())
     
     logger.debug("Parkrun Cancellations processed")
     count = 0
