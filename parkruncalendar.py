@@ -97,10 +97,8 @@ if __name__ == '__main__':
                 for li in e.getchildren():
                     licount += 1
                     lists['Cancellation'].append((currentdate,li.getchildren()[0].text[:-8],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li[{}]/text()'.format(ulcount,licount))[0].split(':')[1].strip()))
-                    #print((currentdate,li.getchildren()[0].text[:-8]),table.xpath('//*[@id="content"]/div[1]/ul[{}]/li[{}]/text()'.format(ulcount,licount))[0])
             else:
                 lists['Cancellation'].append((currentdate,e.getchildren()[0].getchildren()[0].text[:-8],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li/text()'.format(ulcount))[0].split(':')[1].strip()))
-                #print((currentdate,e.getchildren()[0].getchildren()[0].text[:-8]),table.xpath('//*[@id="content"]/div[1]/ul[{}]/li/text()'.format(ulcount))[0])
             
     
     logger.debug("Parkrun Cancellations processed")
