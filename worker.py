@@ -109,7 +109,7 @@ class Worker(multiprocessing.Process):
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
             if runnersAdded:
-                c.execute("update p set p.LastUpdated = e.LastEvent from parkruns as p inner join (select ParkrunID, max(EventDate) as LastEvent from events group by ParkrunID) as e on p.ParkrunID = e.ParkrunID")
+                self.c.execute("update p set p.LastUpdated = e.LastEvent from parkruns as p inner join (select ParkrunID, max(EventDate) as LastEvent from events group by ParkrunID) as e on p.ParkrunID = e.ParkrunID")
             self.logger.debug('Sleeping for {} seconds'.format(self.delay))
             sleep(self.delay)
         c.close()
@@ -305,14 +305,70 @@ class Worker(multiprocessing.Process):
         volunteerNames = [x.strip() for x in root.xpath('//*[@id="content"]/div[2]/p[1]')[0].text.split(':')[1].split(',')]
         volunteers = []
         parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
-        results = self.getEventTable(root)
-        if self.c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
-            for v in volunteerNames:
-                volunteers.append(self.c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(v.split()[0],v.split()[1],parkrun))[0])
-            
-            # Locate the tail walker
+        eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
+        date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
+        results = getEventTable(root)
+        #if self.c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
+        
+        for v in volunteerNames:
+            volunteers.append(c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(v.split()[0],v.split()[1],parkrun))[0])
+        
+        # Locate the tail walker(s)
+        found = True
+        while found:
+            found = False
+            tailwalker = None
             for v in volunteers:
                 try:
-                    tailwalker = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                    tailwalker = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
+                    found = True
+                    self.logger.debug("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, 1)".format(parkrun, eventnumber, tailwalker['AthleteID']))
+                    self.c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, 1)".format(parkrun, eventnumber, tailwalker['AthleteID']))
+                    volunteers = [v for v in volunteers if not (v['AthleteID'] == tailwalker['AthleteID'])]
+                    results = results[:-1]
+                    break
                 except StopIteration:
                     continue
+            
+            if tailwalker is not None:
+                if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {}".format(parkrun, eventnumber, tailwalker['AthleteID']))) == 0:
+                    self.c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, 1)".format(parkrun, eventnumber, tailwalker['AthleteID']))
+        
+            
+        #volunteers = [v for v in volunteers if not (v['AthleteID'] == tailwalker['AthleteID'])]
+        
+        while len(volunteers) > 0:
+            for v in volunteers:
+                athletevol = self.c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+                athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+                table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+                pos = None
+                for r in table.getchildren():
+                    if int(r.getchildren()[0].text) == date.year:
+                        if r.getchildren()[1].text == 'Tail Walker':
+                            continue
+                        if len(athletevol) == 0:
+                            if self.c.execute("SELECT  dbo.getVolunteerID('{}')".format(r.getchildren()[1].text)) is None:
+                                self.c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(r.getchildren()[1].text))
+                            #print(c.execute("SELECT  dbo.getVolunteerID('{}')".format(r.getchildren()[1].text)))
+                            self.c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], r.getchildren()[1].text))
+                            volunteers = [x for x in volunteers if not (x['AthleteID'] == v['AthleteID'])]
+                            break
+                        else:
+                            try:
+                                pos = next(a for a in athletevol if a['Count'] != (int(r.getchildren()[2].text) and a['VolunteerPosition'] == r.getchildren()[1].text))
+                                print(pos)
+                                break
+                            except StopIteration:
+                                continue
+                if pos is not None:
+                    print("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], pos['VolunteerPosition']))
+                    volunteers = [x for x in volunteers if not (x['AthleteID'] == v['AthleteID'])]
+                    break
+                print(len(volunteers))
+                sleep(2)
+            
+            
+
+
+
