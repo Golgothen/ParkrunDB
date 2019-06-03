@@ -101,7 +101,7 @@ def getEventTable(root):
         return None
 
 
-root = getURL('https://www.parkrun.com.au/toolerncreek/results/latestresults/')
+root = getURL('https://www.parkrun.com.au/toolerncreek/results/weeklyresults/?runSeqNumber=220')
 c = Connection(sender_config)
 
 
@@ -134,7 +134,7 @@ while found:
         except StopIteration:
             continue
     
-
+# Retrieve all remaining volunteer stats and remove accounted stats.
 for v in volunteers:
     athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
     table = athletepage.xpath('//*[@id="results"]/tbody')[2]
@@ -144,7 +144,7 @@ for v in volunteers:
             if r.getchildren()[1].text == 'Tail Walker':
                 continue
             v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
-    athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+    athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {} AND VolunteerPosition <> 'Tail Walker'".format(v['AthleteID'], date.year))
     if len(athletevol) > 0:
         for al in athletevol:
             v['Volunteer'][al['VolunteerPosition']] -= al['Count']
@@ -153,17 +153,35 @@ for v in volunteers:
     if v != volunteers[-1]:
         sleep(2)
 
+# Remove all volunteers where all stats are accounted for
+volunteers = [v for v in volunteers if len(v['Volunteer']) > 0]            
+
+# Build a list of required positions not yet filled
+req = c.execute("SELECT * FROM VolunteerPositions WHERE Required = 1")
+eventpositions = c.execute("SELECT VolunteerPositionID FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {})".format(parkrun, eventnumber))
+l = []
+for ep in eventpositions:
+    l.append(ep['VolunteerPositionID'])
+req = [r for r in req if r['VolunteerPositionID'] not in l]
+
+
+
 while len(volunteers)>0:
     for v in volunteers:
         if len(v['Volunteer']) == 1:
             if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {} AND VolunteerPositionID = dbo.getVolunteerID('{}')".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))) == 0:
+                if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}'".format(list(v['Volunteer'].keys())[0]))) == 0:
+                    print("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
+                    c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
+                print("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
                 c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
             for x in volunteers:
                 if x == v:
                     continue
-                if list(v['Volunteer'].keys())[0] in x['Volunteer']:
-                    print('Removing {} from {}'.format(list(v['Volunteer'].keys())[0], x['AthleteID']))
-                    del x['Volunteer'][list(v['Volunteer'].keys())[0]]
+                if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}' AND AllowMultiple = 1".format(list(v['Volunteer'].keys())[0]))) == 0:
+                    if list(v['Volunteer'].keys())[0] in x['Volunteer']:
+                        print('Removing {} from {}'.format(list(v['Volunteer'].keys())[0], x['AthleteID']))
+                        del x['Volunteer'][list(v['Volunteer'].keys())[0]]
             volunteers = [x for x in volunteers if not (v['AthleteID'] == x['AthleteID'])]
             print(len(volunteers))
             break
