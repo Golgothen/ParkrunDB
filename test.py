@@ -115,7 +115,14 @@ def getVolunteers(root):
     #if c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
     
     for v in volunteerNames:
-        volunteers.append(c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(v.split()[0],v.split()[1],parkrun))[0])
+        fn = ''
+        ln = ''
+        n = v.split()
+        fn  = n[0]
+        del n[0]
+        for l in n:
+            ln += l + ' ' 
+        volunteers.append(c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(fn.strip(),ln.strip(),parkrun))[0])
     
     # Retrieve all remaining volunteer stats and remove accounted stats.
     for v in volunteers:
@@ -124,8 +131,6 @@ def getVolunteers(root):
         v['Volunteer'] = {}
         for r in table.getchildren():
             if int(r.getchildren()[0].text) == date.year:
-                #if r.getchildren()[1].text == 'Tail Walker':
-                #    continue
                 v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
         athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
         if len(athletevol) > 0:
@@ -201,6 +206,9 @@ def getVolunteers(root):
             except StopIteration:
                 pass
     
+    # Delete volunteers with empty volunteer lists
+    volunteers = [x for x in volunteers if len(x['Volunteer']) > 0]
+    
     added = True
     while added:
         added = False
@@ -209,12 +217,12 @@ def getVolunteers(root):
                 if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}'".format(list(v['Volunteer'].keys())[0]))) == 0:
                     print("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
                     c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
-                print("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
                 if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {} AND VolunteerPositionID = dbo.getVolunteerID('{}')".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))) == 0:
+                    print("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
                     c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
-                    added = True
-                    volunteers = [x for x in volunteers if x != v]
-                    break
+                added = True
+                volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
+                break
     
     if len(volunteers) > 0:
         print("{} Volunteers remain unassigned".format(len(volunteers)))
