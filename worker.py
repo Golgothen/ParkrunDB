@@ -76,7 +76,8 @@ class Worker(multiprocessing.Process):
                         for row in data:
                             row['EventID'] = eventID
                             c.addParkrunEventPosition(row)
-                        sleep(self.delay)
+                    self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['LatestResultsURL']), parkrun['EventURL'])
+                    sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
                 runnersAdded = False
@@ -106,6 +107,10 @@ class Worker(multiprocessing.Process):
                                 sleep(self.delay)
                             else:
                                 self.logger.debug('getEvent found no runners')
+                        if not c.checkParkrunVolunteers(row):
+                            self.logger.info('Parkrun {} event {}: volunteers did not match - reimporting.'.format(parkrun['EventURL'], row['EventNumber']))
+                            self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                            self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
             if runnersAdded:
@@ -295,78 +300,150 @@ class Worker(multiprocessing.Process):
                 if h == 'EventNumber':
                     d[h] = int(v.getchildren()[0].text)
                 if h in ['Runners','Volunteers']:
-                    d[h] = int(v.text)
+                    if v.text.strip() == 'unknown':
+                        d[h] = 0
+                    else: 
+                        d[h] = int(v.text)
                 if h == 'EventDate':
                     d[h] = datetime.strptime(v.getchildren()[0].text,"%d/%m/%Y")
             data.insert(0,d)
         return data
     
-    def getVolunteers(self, root):
+    def getVolunteers(self, root, eventURL):
+        c = Connection(self.config)
+        
         volunteerNames = [x.strip() for x in root.xpath('//*[@id="content"]/div[2]/p[1]')[0].text.split(':')[1].split(',')]
         volunteers = []
         parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
         eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
         date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
-        results = getEventTable(root)
-        #if self.c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
+        results = self.getEventTable(root)
         
         for v in volunteerNames:
-            volunteers.append(c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(v.split()[0],v.split()[1],parkrun))[0])
+            fn = ''
+            ln = ''
+            n = v.split()
+            fn  = n[0]
+            del n[0]
+            for l in n:
+                ln += l + ' ' 
+            fn = fn.replace("'","''").strip()
+            ln = ln.replace("'","''").strip()
+            candidates = c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(fn,ln,eventURL))
+            if len(candidates) > 0:
+                volunteers.append(candidates[0])
+            else:
+                self.logger.warning("Could not find suitable candidate for {} {} at {}, event {}".format(fn, ln, eventURL, eventnumber))
         
-        # Locate the tail walker(s)
-        found = True
-        while found:
-            found = False
-            tailwalker = None
-            for v in volunteers:
-                try:
-                    tailwalker = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
-                    found = True
-                    self.logger.debug("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, 1)".format(parkrun, eventnumber, tailwalker['AthleteID']))
-                    self.c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, 1)".format(parkrun, eventnumber, tailwalker['AthleteID']))
-                    volunteers = [v for v in volunteers if not (v['AthleteID'] == tailwalker['AthleteID'])]
-                    results = results[:-1]
-                    break
-                except StopIteration:
-                    continue
-            
-            if tailwalker is not None:
-                if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {}".format(parkrun, eventnumber, tailwalker['AthleteID']))) == 0:
-                    self.c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, 1)".format(parkrun, eventnumber, tailwalker['AthleteID']))
-        
-            
-        #volunteers = [v for v in volunteers if not (v['AthleteID'] == tailwalker['AthleteID'])]
-        
-        while len(volunteers) > 0:
-            for v in volunteers:
-                athletevol = self.c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
-                athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-                table = athletepage.xpath('//*[@id="results"]/tbody')[2]
-                pos = None
-                for r in table.getchildren():
-                    if int(r.getchildren()[0].text) == date.year:
-                        if r.getchildren()[1].text == 'Tail Walker':
-                            continue
-                        if len(athletevol) == 0:
-                            if self.c.execute("SELECT  dbo.getVolunteerID('{}')".format(r.getchildren()[1].text)) is None:
-                                self.c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(r.getchildren()[1].text))
-                            #print(c.execute("SELECT  dbo.getVolunteerID('{}')".format(r.getchildren()[1].text)))
-                            self.c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], r.getchildren()[1].text))
-                            volunteers = [x for x in volunteers if not (x['AthleteID'] == v['AthleteID'])]
-                            break
-                        else:
-                            try:
-                                pos = next(a for a in athletevol if a['Count'] != (int(r.getchildren()[2].text) and a['VolunteerPosition'] == r.getchildren()[1].text))
-                                print(pos)
-                                break
-                            except StopIteration:
-                                continue
-                if pos is not None:
-                    print("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], pos['VolunteerPosition']))
-                    volunteers = [x for x in volunteers if not (x['AthleteID'] == v['AthleteID'])]
-                    break
-                print(len(volunteers))
+        # Retrieve all remaining volunteer stats and remove accounted stats.
+        for v in volunteers:
+            athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+            table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+            v['Volunteer'] = {}
+            for r in table.getchildren():
+                if int(r.getchildren()[0].text) == date.year:
+                    v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
+            athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+            if len(athletevol) > 0:
+                for al in athletevol:
+                    v['Volunteer'][al['VolunteerPosition']] -= al['Count']
+                    if v['Volunteer'][al['VolunteerPosition']] == 0:
+                        del v['Volunteer'][al['VolunteerPosition']]
+            if v != volunteers[-1]:
                 sleep(2)
+        
+        #Search results for volunteer athlete ID's that appear in the results
+        req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
+        l = []
+        for r in req:
+            l.append(r['VolunteerPosition'])
+        
+        for v in volunteers:
+            try:
+                a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
+            except StopIteration:
+                pass
+        
+        #Remove volunteer positions from people who don't appear in the results
+        req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
+        l = []
+        for r in req:
+            l.append(r['VolunteerPosition'])
+        
+        for v in volunteers:
+            try:
+                a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+            except StopIteration:
+                v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
+        
+        #Search for vital roles
+        req = c.execute("SELECT * FROM VolunteerPositions WHERE Required = 1")
+        l = []
+        for r in req:
+            l.append(r['VolunteerPosition'])
+        
+        for v in volunteers:
+            if len(v['Volunteer']) == 1:
+                try:
+                    l.remove(next(r for r in v['Volunteer'] if r in l))
+                except StopIteration:
+                    pass
+        
+        removed = True
+        while removed:
+            removed = False
+            for r in l:
+                for v in volunteers:
+                    if r in v['Volunteer']:
+                        self.logger.debug("Assigning {} to {} {}".format(r, v['FirstName'], v['LastName']))
+                        v['Volunteer'] = {r: v['Volunteer'][r]}
+                        removed = True
+                        l.remove(r)
+                        break
+                        
+        #Search for duplicate positions that are not allowed
+        req = c.execute("SELECT * FROM VolunteerPositions WHERE AllowMultiple = 0")
+        l = []
+        for r in req:
+            l.append(r['VolunteerPosition'])
+        
+        for v in volunteers:
+            if any(name in v['Volunteer'] for name in l):
+                try:
+                    p = next(r for r in v['Volunteer'] if r in l and len(v['Volunteer']) > 1)
+                    self.logger.debug('Deleting {} from {} {}'.format(p, v['FirstName'], v['LastName']))
+                    del v['Volunteer'][p]
+                except StopIteration:
+                    pass
+        
+        # Delete volunteers with empty volunteer lists
+        volunteers = [x for x in volunteers if len(x['Volunteer']) > 0]
+        
+        # Any athlete with more than one possible volunteer role: just pick the first one
+        for v in volunteers:
+            if len(v['Volunteer']) > 1:
+                v['Volunteer'] = {list(v['Volunteer'].keys())[0] : v['Volunteer'][list(v['Volunteer'].keys())[0]]}
+                self.logger.debug("Set {} {} to {}".format(v['FirstName'], v['LastName'], list(v['Volunteer'].keys())[0]))
+        added = True
+        while added:
+            added = False
+            for v in volunteers:
+                if len(v['Volunteer']) == 1:
+                    if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}'".format(list(v['Volunteer'].keys())[0]))) == 0:
+                        self.logger.info("Adding volunteer position {}".format(list(v['Volunteer'].keys())[0]))
+                        c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
+                    if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {} AND VolunteerPositionID = dbo.getVolunteerID('{}')".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))) == 0:
+                        self.logger.info("Adding {} {} as {}".format(v['FirstName'],v['LastName'], list(v['Volunteer'].keys())[0]))
+                        c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
+                    added = True
+                    volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
+                    break
+        
+        if len(volunteers) > 0:
+            self.logger.warning("{} Volunteers remain unassigned:".format(len(volunteers)))
+            for v in volunteers:
+                self.logger.warning(v)
             
             
 
