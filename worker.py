@@ -335,6 +335,17 @@ class Worker(multiprocessing.Process):
             else:
                 self.logger.warning("Could not find suitable candidate for {} {} at {}, event {}".format(fn, ln, eventURL, eventnumber))
         
+        # Remove athletes that already have volunteered for this event
+        found = True
+        while found:
+            found = False
+            for v in volunteers:
+                if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {}".format(parkrun, eventnumber, v['AthleteID']))) > 0:
+                    found = True
+                    self.logger.info('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
+                    volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
+                    break
+        
         # Retrieve all remaining volunteer stats and remove accounted stats.
         for v in volunteers:
             athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
