@@ -131,13 +131,10 @@ class Connection():
 
     def checkParkrunVolunteers(self, row):
         r = self.execute("SELECT dbo.getParkrunEventVolunteers('{}', {})".format(row['EventURL'], row['EventNumber']))
-        if r is None:
+        if r != row['Volunteers']:
             return False
         else:
-            if r != row['Volunteers']:
-                return False
-            else:
-                return True
+            return True
 
     def getClub(self, club):
         if self.cachedClub is None:
