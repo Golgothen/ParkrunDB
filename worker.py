@@ -301,7 +301,7 @@ class Worker(multiprocessing.Process):
                     d[h] = int(v.getchildren()[0].text)
                 if h in ['Runners','Volunteers']:
                     if v.text.strip() == 'unknown':
-                        d[h] = 0
+                        d[h] = None
                     else: 
                         d[h] = int(v.text)
                 if h == 'EventDate':
@@ -338,17 +338,22 @@ class Worker(multiprocessing.Process):
         # Retrieve all remaining volunteer stats and remove accounted stats.
         for v in volunteers:
             athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-            table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+            if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
+                table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+            else:
+                self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], parkrun, eventnumber))
+                table = None
             v['Volunteer'] = {}
-            for r in table.getchildren():
-                if int(r.getchildren()[0].text) == date.year:
-                    v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
-            athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
-            if len(athletevol) > 0:
-                for al in athletevol:
-                    v['Volunteer'][al['VolunteerPosition']] -= al['Count']
-                    if v['Volunteer'][al['VolunteerPosition']] == 0:
-                        del v['Volunteer'][al['VolunteerPosition']]
+            if table is not None:
+                for r in table.getchildren():
+                    if int(r.getchildren()[0].text) == date.year:
+                        v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
+                athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+                if len(athletevol) > 0:
+                    for al in athletevol:
+                        v['Volunteer'][al['VolunteerPosition']] -= al['Count']
+                        if v['Volunteer'][al['VolunteerPosition']] == 0:
+                            del v['Volunteer'][al['VolunteerPosition']]
             if v != volunteers[-1]:
                 sleep(2)
         
