@@ -102,18 +102,18 @@ def getEventTable(root):
 
 c = Connection(sender_config)
 
-root = getURL('https://www.parkrun.com.au/toolerncreek/results/weeklyresults/?runSeqNumber=169')
+root = getURL('https://www.parkrun.com.au/albert-melbourne/results/weeklyresults/?runSeqNumber=72')
 
 def getVolunteers(root):
     
-    volunteerNames = [x.strip() for x in root.xpath('//*[@id="content"]/div[2]/p[1]')[0].text.split(':')[1].split(',')]
-    volunteers = []
-    parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
-    eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
-    date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
-    results = getEventTable(root)
-    #if c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
-    
+volunteerNames = [x.strip() for x in root.xpath('//*[@id="content"]/div[2]/p[1]')[0].text.split(':')[1].split(',')]
+volunteers = []
+parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
+eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
+date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
+results = getEventTable(root)
+#if c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
+
     for v in volunteerNames:
         fn = ''
         ln = ''
@@ -122,22 +122,36 @@ def getVolunteers(root):
         del n[0]
         for l in n:
             ln += l + ' ' 
-        volunteers.append(c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(fn.strip(),ln.strip(),parkrun))[0])
+        fn = fn.replace("'","''").strip()
+        ln = ln.replace("'","''").strip()
+        candidates = c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(fn,ln,eventURL))
+        if len(candidates) > 0:
+            volunteers.append(candidates[0])
+        else:
+            print("Could not find suitable candidate for {} {} at {}, event {}".format(fn, ln, eventURL, eventnumber))
+    
     
     # Retrieve all remaining volunteer stats and remove accounted stats.
     for v in volunteers:
         athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-        table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+    for v in volunteers:
+        athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+        if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
+            table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+        else:
+            print("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], parkrun, eventnumber))
+            table = None
         v['Volunteer'] = {}
-        for r in table.getchildren():
-            if int(r.getchildren()[0].text) == date.year:
-                v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
-        athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
-        if len(athletevol) > 0:
-            for al in athletevol:
-                v['Volunteer'][al['VolunteerPosition']] -= al['Count']
-                if v['Volunteer'][al['VolunteerPosition']] == 0:
-                    del v['Volunteer'][al['VolunteerPosition']]
+        if table is not None:
+            for r in table.getchildren():
+                if int(r.getchildren()[0].text) == date.year:
+                    v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
+            athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+            if len(athletevol) > 0:
+                for al in athletevol:
+                    v['Volunteer'][al['VolunteerPosition']] -= al['Count']
+                    if v['Volunteer'][al['VolunteerPosition']] == 0:
+                        del v['Volunteer'][al['VolunteerPosition']]
         if v != volunteers[-1]:
             sleep(2)
     
@@ -209,6 +223,12 @@ def getVolunteers(root):
     # Delete volunteers with empty volunteer lists
     volunteers = [x for x in volunteers if len(x['Volunteer']) > 0]
     
+    # Any athlete with more than one possible volunteer role: just pick the first one
+    for v in volunteers:
+        if len(v['Volunteer']) > 1:
+            v['Volunteer'] = {list(v['Volunteer'].keys())[0] : v['Volunteer'][list(v['Volunteer'].keys())[0]]}
+            print("Set {} {} to {}".format(v['FirstName'], v['LastName'], list(v['Volunteer'].keys())[0]))
+
     added = True
     while added:
         added = False
