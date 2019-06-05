@@ -103,6 +103,7 @@ def getEventTable(root):
 c = Connection(sender_config)
 
 root = getURL('https://www.parkrun.com.au/albert-melbourne/results/weeklyresults/?runSeqNumber=72')
+eventURL = 'albert-melbourne'
 
 def getVolunteers(root):
     
@@ -114,140 +115,148 @@ date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().spl
 results = getEventTable(root)
 #if c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun)) == 'Standard':
 
-    for v in volunteerNames:
-        fn = ''
-        ln = ''
-        n = v.split()
-        fn  = n[0]
-        del n[0]
-        for l in n:
-            ln += l + ' ' 
-        fn = fn.replace("'","''").strip()
-        ln = ln.replace("'","''").strip()
-        candidates = c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(fn,ln,eventURL))
-        if len(candidates) > 0:
-            volunteers.append(candidates[0])
-        else:
-            print("Could not find suitable candidate for {} {} at {}, event {}".format(fn, ln, eventURL, eventnumber))
+for v in volunteerNames:
+    fn = ''
+    ln = ''
+    n = v.split()
+    fn  = n[0]
+    del n[0]
+    for l in n:
+        ln += l + ' ' 
+    fn = fn.replace("'","''").strip()
+    ln = ln.replace("'","''").strip()
+    candidates = c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(fn,ln,eventURL))
+    if len(candidates) > 0:
+        volunteers.append(candidates[0])
+    else:
+        print("Could not find suitable candidate for {} {} at {}, event {}".format(fn, ln, eventURL, eventnumber))
     
-    
-    # Retrieve all remaining volunteer stats and remove accounted stats.
+# Remove athletes that already have volunteered for this event
+found = True
+while found:
     for v in volunteers:
-        athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-    for v in volunteers:
-        athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-        if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
-            table = athletepage.xpath('//*[@id="results"]/tbody')[2]
-        else:
-            print("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], parkrun, eventnumber))
-            table = None
-        v['Volunteer'] = {}
-        if table is not None:
-            for r in table.getchildren():
-                if int(r.getchildren()[0].text) == date.year:
-                    v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
-            athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
-            if len(athletevol) > 0:
-                for al in athletevol:
-                    v['Volunteer'][al['VolunteerPosition']] -= al['Count']
-                    if v['Volunteer'][al['VolunteerPosition']] == 0:
-                        del v['Volunteer'][al['VolunteerPosition']]
-        if v != volunteers[-1]:
-            sleep(2)
+        found = False
+        if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {}".format(parkrun, eventnumber, v['AthleteID']))) > 0:
+            found = True
+            print('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
+            volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
+            break
     
-    #Search results for volunteer athlete ID's that appear in the results
-    req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
-    l = []
-    for r in req:
-        l.append(r['VolunteerPosition'])
+# Retrieve all remaining volunteer stats and remove accounted stats.
+for v in volunteers:
+    athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+    if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
+        table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+    else:
+        print("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], parkrun, eventnumber))
+        table = None
+    v['Volunteer'] = {}
+    if table is not None:
+        for r in table.getchildren():
+            if int(r.getchildren()[0].text) == date.year:
+                v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
+        athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+        if len(athletevol) > 0:
+            for al in athletevol:
+                v['Volunteer'][al['VolunteerPosition']] -= al['Count']
+                if v['Volunteer'][al['VolunteerPosition']] == 0:
+                    del v['Volunteer'][al['VolunteerPosition']]
+    if v != volunteers[-1]:
+        sleep(2)
     
-    for v in volunteers:
+#Search results for volunteer athlete ID's that appear in the results
+req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
+l = []
+for r in req:
+    l.append(r['VolunteerPosition'])
+
+for v in volunteers:
+    try:
+        a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+        v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
+    except StopIteration:
+        pass
+
+#Remove volunteer positions from people who don't appear in the results
+req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
+l = []
+for r in req:
+    l.append(r['VolunteerPosition'])
+
+for v in volunteers:
+    try:
+        a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+    except StopIteration:
+        v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
+
+#Search for vital roles
+req = c.execute("SELECT * FROM VolunteerPositions WHERE Required = 1 and VolunteerPosition <> 'Tail Walker'")
+l = []
+for r in req:
+    l.append(r['VolunteerPosition'])
+
+for v in volunteers:
+    if len(v['Volunteer']) == 1:
         try:
-            a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-            v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
+            l.remove(next(r for r in v['Volunteer'] if r in l))
         except StopIteration:
             pass
-    
-    #Remove volunteer positions from people who don't appear in the results
-    req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
-    l = []
-    for r in req:
-        l.append(r['VolunteerPosition'])
-    
-    for v in volunteers:
+
+removed = True
+while removed:
+    removed = False
+    for r in l:
+        for v in volunteers:
+            if r in v['Volunteer']:
+                print("Assigning {} to {}".format(r, v['AthleteID']))
+                v['Volunteer'] = {r: v['Volunteer'][r]}
+                removed = True
+                l.remove(r)
+                break
+                
+#Search for duplicate positions that are not allowed
+req = c.execute("SELECT * FROM VolunteerPositions WHERE AllowMultiple = 0")
+l = []
+for r in req:
+    l.append(r['VolunteerPosition'])
+
+for v in volunteers:
+    if any(name in v['Volunteer'] for name in l):
         try:
-            a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+            p = next(r for r in v['Volunteer'] if r in l and len(v['Volunteer']) > 1)
+            print('Deleting {} from {}'.format(p, v['AthleteID']))
+            del v['Volunteer'][p]
         except StopIteration:
-            v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
-    
-    #Search for vital roles
-    req = c.execute("SELECT * FROM VolunteerPositions WHERE Required = 1 and VolunteerPosition <> 'Tail Walker'")
-    l = []
-    for r in req:
-        l.append(r['VolunteerPosition'])
-    
+            pass
+
+# Delete volunteers with empty volunteer lists
+volunteers = [x for x in volunteers if len(x['Volunteer']) > 0]
+
+# Any athlete with more than one possible volunteer role: just pick the first one
+for v in volunteers:
+    if len(v['Volunteer']) > 1:
+        v['Volunteer'] = {list(v['Volunteer'].keys())[0] : v['Volunteer'][list(v['Volunteer'].keys())[0]]}
+        print("Set {} {} to {}".format(v['FirstName'], v['LastName'], list(v['Volunteer'].keys())[0]))
+
+added = True
+while added:
+    added = False
     for v in volunteers:
         if len(v['Volunteer']) == 1:
-            try:
-                l.remove(next(r for r in v['Volunteer'] if r in l))
-            except StopIteration:
-                pass
-    
-    removed = True
-    while removed:
-        removed = False
-        for r in l:
-            for v in volunteers:
-                if r in v['Volunteer']:
-                    print("Assigning {} to {}".format(r, v['AthleteID']))
-                    v['Volunteer'] = {r: v['Volunteer'][r]}
-                    removed = True
-                    l.remove(r)
-                    break
-                    
-    #Search for duplicate positions that are not allowed
-    req = c.execute("SELECT * FROM VolunteerPositions WHERE AllowMultiple = 0")
-    l = []
-    for r in req:
-        l.append(r['VolunteerPosition'])
-    
-    for v in volunteers:
-        if any(name in v['Volunteer'] for name in l):
-            try:
-                p = next(r for r in v['Volunteer'] if r in l and len(v['Volunteer']) > 1)
-                print('Deleting {} from {}'.format(p, v['AthleteID']))
-                del v['Volunteer'][p]
-            except StopIteration:
-                pass
-    
-    # Delete volunteers with empty volunteer lists
-    volunteers = [x for x in volunteers if len(x['Volunteer']) > 0]
-    
-    # Any athlete with more than one possible volunteer role: just pick the first one
-    for v in volunteers:
-        if len(v['Volunteer']) > 1:
-            v['Volunteer'] = {list(v['Volunteer'].keys())[0] : v['Volunteer'][list(v['Volunteer'].keys())[0]]}
-            print("Set {} {} to {}".format(v['FirstName'], v['LastName'], list(v['Volunteer'].keys())[0]))
+            if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}'".format(list(v['Volunteer'].keys())[0]))) == 0:
+                print("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
+                c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
+            if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {} AND VolunteerPositionID = dbo.getVolunteerID('{}')".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))) == 0:
+                print("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
+                c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
+            added = True
+            volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
+            break
 
-    added = True
-    while added:
-        added = False
-        for v in volunteers:
-            if len(v['Volunteer']) == 1:
-                if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}'".format(list(v['Volunteer'].keys())[0]))) == 0:
-                    print("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
-                    c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
-                if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {} AND VolunteerPositionID = dbo.getVolunteerID('{}')".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))) == 0:
-                    print("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
-                    c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
-                added = True
-                volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
-                break
-    
-    if len(volunteers) > 0:
-        print("{} Volunteers remain unassigned".format(len(volunteers)))
-        for v in volunteers:
-            print(v)
+if len(volunteers) > 0:
+    print("{} Volunteers remain unassigned".format(len(volunteers)))
+    for v in volunteers:
+        print(v)
                 
     
     
