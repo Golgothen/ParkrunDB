@@ -340,7 +340,7 @@ class Worker(multiprocessing.Process):
         while found:
             found = False
             for v in volunteers:
-                if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {}".format(parkrun, eventnumber, v['AthleteID']))) > 0:
+                if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {}".format(eventURL, eventnumber, v['AthleteID']))) > 0:
                     found = True
                     self.logger.info('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
                     volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
@@ -449,9 +449,9 @@ class Worker(multiprocessing.Process):
                     if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}'".format(list(v['Volunteer'].keys())[0]))) == 0:
                         self.logger.info("Adding volunteer position {}".format(list(v['Volunteer'].keys())[0]))
                         c.execute("INSERT INTO VolunteerPositions (VolunteerPosition) VALUES ('{}')".format(list(v['Volunteer'].keys())[0]))
-                    if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {} AND VolunteerPositionID = dbo.getVolunteerID('{}')".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))) == 0:
+                    if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {} AND VolunteerPositionID = dbo.getVolunteerID('{}')".format(eventURL, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))) == 0:
                         self.logger.info("Adding {} {} as {}".format(v['FirstName'],v['LastName'], list(v['Volunteer'].keys())[0]))
-                        c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(parkrun, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
+                        c.execute("INSERT INTO EventVolunteers (EventID, AthleteID, VolunteerPositionID) VALUES (dbo.getEventID('{}', {}), {}, dbo.getVolunteerID('{}'))".format(eventURL, eventnumber, v['AthleteID'], list(v['Volunteer'].keys())[0]))
                     added = True
                     volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
                     break

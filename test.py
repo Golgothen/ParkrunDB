@@ -102,7 +102,7 @@ def getEventTable(root):
 
 c = Connection(sender_config)
 
-root = getURL('https://www.parkrun.com.au/albert-melbourne/results/weeklyresults/?runSeqNumber=72')
+root = getURL('https://www.parkrun.com.au/albert-melbourne/results/weeklyresults/?runSeqNumber=125')
 eventURL = 'albert-melbourne'
 
 def getVolunteers(root):
@@ -177,6 +177,9 @@ for v in volunteers:
     except StopIteration:
         pass
 
+# TODO: Locate tail walkers correctly from the rear of the field
+
+ 
 #Remove volunteer positions from people who don't appear in the results
 req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
 l = []
