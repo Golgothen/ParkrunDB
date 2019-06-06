@@ -380,7 +380,7 @@ class Worker(multiprocessing.Process):
                 v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
             except StopIteration:
                 pass
-        
+
         #Remove volunteer positions from people who don't appear in the results
         req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
         l = []
@@ -393,8 +393,25 @@ class Worker(multiprocessing.Process):
             except StopIteration:
                 v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
         
+        # TODO: Locate tail walkers correctly from the rear of the field
+        found = True
+        while found:
+            found = False
+            for v in volunteers:
+                try:
+                    a = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
+                    self.logger.debug(a)
+                    v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
+                    results = results[:-1]
+                    self.logger.debug('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
+                    found = True
+                except StopIteration:
+                    if 'Tail Walker' in v['Volunteer'] and len(v['Volunteer']) > 1:
+                        del v['Volunteer']['Tail Walker']
+                        self.logger.debug('Deleting Tail Walker from {} {}'.format(v['FirstName'], v['LastName']))
+        
         #Search for vital roles
-        req = c.execute("SELECT * FROM VolunteerPositions WHERE Required = 1")
+        req = c.execute("SELECT VolunteerPositions.VolunteerPosition FROM VolunteerPositions LEFT OUTER JOIN EventVolunteers ON VolunteerPositions.VolunteerPositionID = EventVolunteers.VolunteerPositionID WHERE (VolunteerPositions.Required = 1) AND (EventVolunteers.EventID = dbo.getEventID('{}', {})) AND (EventVolunteers.AthleteID IS NULL) OR  (VolunteerPositions.Required = 1) AND (EventVolunteers.EventID IS NULL) AND (EventVolunteers.AthleteID IS NULL)".format(eventURL, eventnumber))
         l = []
         for r in req:
             l.append(r['VolunteerPosition'])
@@ -406,17 +423,20 @@ class Worker(multiprocessing.Process):
                 except StopIteration:
                     pass
         
-        removed = True
-        while removed:
-            removed = False
+        found = True
+        while found:
+            found = False
             for r in l:
                 for v in volunteers:
                     if r in v['Volunteer']:
                         self.logger.debug("Assigning {} to {} {}".format(r, v['FirstName'], v['LastName']))
                         v['Volunteer'] = {r: v['Volunteer'][r]}
-                        removed = True
+                        found = True
                         l.remove(r)
                         break
+        if len(l) > 0:
+            for x in l:
+                self.logger.warning("Position {} for {} event {} has not been filled. Investigate".format(x, eventURL, eventnumber))                
                         
         #Search for duplicate positions that are not allowed
         req = c.execute("SELECT * FROM VolunteerPositions WHERE AllowMultiple = 0")
@@ -434,6 +454,9 @@ class Worker(multiprocessing.Process):
                     pass
         
         # Delete volunteers with empty volunteer lists
+        for v in volunteers:
+            if len(v['Volunteer']) == 0:
+                self.logger.warning("Athlete {} {} ({}) did not get a volunteer position for {} event {}. Investigate".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
         volunteers = [x for x in volunteers if len(x['Volunteer']) > 0]
         
         # Any athlete with more than one possible volunteer role: just pick the first one
@@ -441,6 +464,8 @@ class Worker(multiprocessing.Process):
             if len(v['Volunteer']) > 1:
                 v['Volunteer'] = {list(v['Volunteer'].keys())[0] : v['Volunteer'][list(v['Volunteer'].keys())[0]]}
                 self.logger.debug("Set {} {} to {}".format(v['FirstName'], v['LastName'], list(v['Volunteer'].keys())[0]))
+        
+        # Append the results
         added = True
         while added:
             added = False
