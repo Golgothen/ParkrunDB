@@ -1,1 +1,1 @@
-python parkrundl.py --processes 1 --delay 2 --event toolerncreek
+python parkrundl.py --processes 1 --delay 2 --region victoria

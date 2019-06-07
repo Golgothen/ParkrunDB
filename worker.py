@@ -334,17 +334,13 @@ class Worker(multiprocessing.Process):
                 volunteers.append(candidates[0])
             else:
                 self.logger.warning("Could not find suitable candidate for {} {} at {}, event {}".format(fn, ln, eventURL, eventnumber))
+                volunteers.append({'AthleteID': 0, 'FirstName': fn, 'LastName' : ln})
         
         # Remove athletes that already have volunteered for this event
-        found = True
-        while found:
-            found = False
-            for v in volunteers:
-                if len(c.execute("SELECT * FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}) AND AthleteID = {}".format(eventURL, eventnumber, v['AthleteID']))) > 0:
-                    found = True
-                    self.logger.info('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
-                    volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
-                    break
+        vl = c.execute("SELECT Athletes.AthleteID, FirstName, LastName FROM EventVolunteers  INNER JOIN Athletes on Athletes.AthleteID = EventVolunteers.AthleteID WHERE EventID = dbo.getEventID('{}', {})".format(parkrun, eventnumber))
+        for v in vl:
+            volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
+            self.logger.info('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
         
         # Retrieve all remaining volunteer stats and remove accounted stats.
         for v in volunteers:
@@ -352,7 +348,7 @@ class Worker(multiprocessing.Process):
             if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
                 table = athletepage.xpath('//*[@id="results"]/tbody')[2]
             else:
-                self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], parkrun, eventnumber))
+                self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
                 table = None
             v['Volunteer'] = {}
             if table is not None:
@@ -390,6 +386,7 @@ class Worker(multiprocessing.Process):
         for v in volunteers:
             try:
                 a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                self.logger.debug(a)
             except StopIteration:
                 v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
         
@@ -401,17 +398,18 @@ class Worker(multiprocessing.Process):
                 try:
                     a = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
                     self.logger.debug(a)
-                    v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
-                    results = results[:-1]
-                    self.logger.debug('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
-                    found = True
+                    if 'Tail Walker' in v['Volunteer']:
+                        v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
+                        results = results[:-1]
+                        self.logger.debug('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
+                        found = True
                 except StopIteration:
                     if 'Tail Walker' in v['Volunteer'] and len(v['Volunteer']) > 1:
                         del v['Volunteer']['Tail Walker']
                         self.logger.debug('Deleting Tail Walker from {} {}'.format(v['FirstName'], v['LastName']))
         
         #Search for vital roles
-        req = c.execute("SELECT VolunteerPositions.VolunteerPosition FROM VolunteerPositions LEFT OUTER JOIN EventVolunteers ON VolunteerPositions.VolunteerPositionID = EventVolunteers.VolunteerPositionID WHERE (VolunteerPositions.Required = 1) AND (EventVolunteers.EventID = dbo.getEventID('{}', {})) AND (EventVolunteers.AthleteID IS NULL) OR  (VolunteerPositions.Required = 1) AND (EventVolunteers.EventID IS NULL) AND (EventVolunteers.AthleteID IS NULL)".format(eventURL, eventnumber))
+        req = c.execute("SELECT VolunteerPosition FROM VolunteerPositions WHERE VolunteerPositions.Required = 1 AND VolunteerPositionID NOT IN (SELECT VolunteerPositionID FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}))".format(eventURL, eventnumber))
         l = []
         for r in req:
             l.append(r['VolunteerPosition'])
@@ -429,14 +427,32 @@ class Worker(multiprocessing.Process):
             for r in l:
                 for v in volunteers:
                     if r in v['Volunteer']:
-                        self.logger.debug("Assigning {} to {} {}".format(r, v['FirstName'], v['LastName']))
+                        self.logger.info("Assigning {} to {}".format(r, v['AthleteID']))
                         v['Volunteer'] = {r: v['Volunteer'][r]}
                         found = True
                         l.remove(r)
+                        for y in volunteers:
+                            if y['AthleteID'] != v['AthleteID']:
+                                if r in y['Volunteer']:
+                                    del y['Volunteer'][r]
                         break
-        if len(l) > 0:
+        
+        while len(l) > 0:
             for x in l:
-                self.logger.warning("Position {} for {} event {} has not been filled. Investigate".format(x, eventURL, eventnumber))                
+                found = False
+                for v in volunteers:
+                    if len(v['Volunteer']) == 0:
+                        v['Volunteer'] = {x : 1}
+                        self.logger.info("Position {} at {} event {} has been filled by Unknown Athlete {} {}.".format(x, eventURL, eventnumber, v['FirstName'], v['LastName']))
+                        found = True
+                        l.remove(x)
+                        break
+                if found:
+                    break
+                else:
+                    self.logger.warning("Position {} at {} event {} has not been filled. Investigate".format(x, eventURL, eventnumber))
+                    l.remove(x)
+                    break                
                         
         #Search for duplicate positions that are not allowed
         req = c.execute("SELECT * FROM VolunteerPositions WHERE AllowMultiple = 0")
@@ -457,7 +473,7 @@ class Worker(multiprocessing.Process):
         for v in volunteers:
             if len(v['Volunteer']) == 0:
                 self.logger.warning("Athlete {} {} ({}) did not get a volunteer position for {} event {}. Investigate".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
-        volunteers = [x for x in volunteers if len(x['Volunteer']) > 0]
+                v['Volunteer']['Unknown'] = 1
         
         # Any athlete with more than one possible volunteer role: just pick the first one
         for v in volunteers:
