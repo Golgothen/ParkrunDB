@@ -107,8 +107,8 @@ def printv():
         print(v)
     print(len(volunteers))
 
-root = getURL('https://www.parkrun.com.au/albert-melbourne/results/weeklyresults/?runSeqNumber=3')
-eventURL = 'albert-melbourne'
+root = getURL('https://www.parkrun.com.au/lornebeach/results/weeklyresults/?runSeqNumber=10')
+eventURL = 'lornebeach'
 
 def getVolunteers(root):
     
@@ -120,6 +120,11 @@ parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[
 eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
 date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
 results = getEventTable(root)
+
+if volunteerNames[0] == '':
+    #No volunteer information
+    print('{} event {} has no volunteer information'.format(eventURL, eventnumber))
+    return
 
 for v in volunteerNames:
     fn = ''
@@ -146,13 +151,15 @@ for v in vl:
 
 # Retrieve all remaining volunteer stats and remove accounted stats.
 for v in volunteers:
-    athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-    if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
-        table = athletepage.xpath('//*[@id="results"]/tbody')[2]
-    else:
-        print("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
-        table = None
     v['Volunteer'] = {}
+    table = None
+    if v['AthleteID'] != 0:
+        athletepage = getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+        if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
+            if athletepage.xpath('//*[@id="content"]/div[4]')[0].getchildren()[0].text == 'Volunteer Summary':
+                table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+            else:
+                print("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
     if table is not None:
         for r in table.getchildren():
             if int(r.getchildren()[0].text) == date.year:
@@ -163,8 +170,8 @@ for v in volunteers:
                 v['Volunteer'][al['VolunteerPosition']] -= al['Count']
                 if v['Volunteer'][al['VolunteerPosition']] == 0:
                     del v['Volunteer'][al['VolunteerPosition']]
-    if v != volunteers[-1]:
-        sleep(2)
+        if v != volunteers[-1]:
+            sleep(2)
 
 #Search results for volunteer athlete ID's that appear in the results
 req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
@@ -175,7 +182,8 @@ for r in req:
 for v in volunteers:
     try:
         a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-        v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
+        if v['AthleteID'] !- 0:
+            v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
     except StopIteration:
         pass
 
