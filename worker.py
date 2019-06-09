@@ -141,7 +141,7 @@ class Worker(multiprocessing.Process):
                 self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
                 return None
         temp = f.read().decode('utf-8', errors='ignore')
-        self.logger.debug('URL returned string of length {}'.format(len(temp)))
+        #self.logger.debug('URL returned string of length {}'.format(len(temp)))
         return lxml.html.fromstring(temp) 
     
     def getEventTable(self, root):
@@ -319,6 +319,11 @@ class Worker(multiprocessing.Process):
         date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
         results = self.getEventTable(root)
         
+        if volunteerNames[0] == '':
+            #No volunteer information
+            self.logger.warning('{} event {} has no volunteer information'.format(eventURL, eventnumber))
+            return
+
         for v in volunteerNames:
             fn = ''
             ln = ''
@@ -344,13 +349,27 @@ class Worker(multiprocessing.Process):
         
         # Retrieve all remaining volunteer stats and remove accounted stats.
         for v in volunteers:
-            athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-            if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
-                table = athletepage.xpath('//*[@id="results"]/tbody')[2]
-            else:
-                self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
-                table = None
             v['Volunteer'] = {}
+            table = None
+            if v['AthleteID'] != 0:
+                found = False
+                retry = 0
+                athletepage = None
+                while not found or retry < 3:
+                    athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+                    if athletepage is not None:
+                        found = True
+                    else:
+                        retry += 1
+                        self.logger.warning("URL Error for athlete {} on attempt {}".format(v['AthleteID'], retry))
+                        sleep(2)
+                if athletePage is None:
+                    self.logger.error("Failed to retrieve athlete stats for {} {} ({}), Skipping".format(v['FirstName'], v['LastName'], v['AthleteID']))
+                if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
+                    if athletepage.xpath('//*[@id="content"]/div[4]')[0].getchildren()[0].text == 'Volunteer Summary':
+                        table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+                    else:
+                        self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
             if table is not None:
                 for r in table.getchildren():
                     if int(r.getchildren()[0].text) == date.year:
@@ -358,11 +377,12 @@ class Worker(multiprocessing.Process):
                 athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
                 if len(athletevol) > 0:
                     for al in athletevol:
-                        v['Volunteer'][al['VolunteerPosition']] -= al['Count']
-                        if v['Volunteer'][al['VolunteerPosition']] == 0:
-                            del v['Volunteer'][al['VolunteerPosition']]
-            if v != volunteers[-1]:
-                sleep(2)
+                        if al['VolunteerPosition'] in v['Volunteer']:
+                            v['Volunteer'][al['VolunteerPosition']] -= al['Count']
+                            if v['Volunteer'][al['VolunteerPosition']] == 0:
+                                del v['Volunteer'][al['VolunteerPosition']]
+                if v != volunteers[-1]:
+                    sleep(2)
         
         #Search results for volunteer athlete ID's that appear in the results
         req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
@@ -373,7 +393,8 @@ class Worker(multiprocessing.Process):
         for v in volunteers:
             try:
                 a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-                v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
+                if v['AthleteID'] != 0:
+                    v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
             except StopIteration:
                 pass
 
@@ -401,7 +422,7 @@ class Worker(multiprocessing.Process):
                     if 'Tail Walker' in v['Volunteer']:
                         v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
                         results = results[:-1]
-                        self.logger.debug('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
+                        self.logger.info('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
                         found = True
                 except StopIteration:
                     if 'Tail Walker' in v['Volunteer'] and len(v['Volunteer']) > 1:
@@ -427,7 +448,7 @@ class Worker(multiprocessing.Process):
             for r in l:
                 for v in volunteers:
                     if r in v['Volunteer']:
-                        self.logger.info("Assigning {} to {}".format(r, v['AthleteID']))
+                        self.logger.info("Setting {} to {} {}".format(r, v['FirstName'], v['LastName']))
                         v['Volunteer'] = {r: v['Volunteer'][r]}
                         found = True
                         l.remove(r)
@@ -441,7 +462,7 @@ class Worker(multiprocessing.Process):
             for x in l:
                 found = False
                 for v in volunteers:
-                    if len(v['Volunteer']) == 0:
+                    if len(v['Volunteer']) == 0:# and v['AthleteID'] != 0:
                         v['Volunteer'] = {x : 1}
                         self.logger.info("Position {} at {} event {} has been filled by Unknown Athlete {} {}.".format(x, eventURL, eventnumber, v['FirstName'], v['LastName']))
                         found = True
@@ -479,7 +500,7 @@ class Worker(multiprocessing.Process):
         for v in volunteers:
             if len(v['Volunteer']) > 1:
                 v['Volunteer'] = {list(v['Volunteer'].keys())[0] : v['Volunteer'][list(v['Volunteer'].keys())[0]]}
-                self.logger.debug("Set {} {} to {}".format(v['FirstName'], v['LastName'], list(v['Volunteer'].keys())[0]))
+                self.logger.info("Setting {} {} to {}".format(v['FirstName'], v['LastName'], list(v['Volunteer'].keys())[0]))
         
         # Append the results
         added = True
