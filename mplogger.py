@@ -19,7 +19,7 @@ sender_config = {
             'level':       'INFO',
         },
         'worker': {
-            'level':       'DEBUG',
+            'level':       'INFO',
         },
         'parkrunlist': {
             'level':       'INFO',
@@ -28,7 +28,7 @@ sender_config = {
             'level':       'INFO',
         },
         'dbconnection': {
-            'level':       'DEBUG',
+            'level':       'INFO',
         },
     },
     'root': {
