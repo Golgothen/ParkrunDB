@@ -65,6 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--exclude_event', nargs = '+',  help = 'Specify event/s to exclude from import. Surround the name with double quotes if it contains a space. Seperate multiple events with spaces.')
     parser.add_argument('--mode', nargs = 1, default = ['Normal'], help = 'Valid modes are Normal, CheckURLs or NewEvents')
     parser.add_argument('--delay', type = int, default = 10, help = 'Wait n seconds before processing the next event')
+    parser.add_argument('--year', type = int, default = 0, help = 'Download results only for a specific year. Default is all, Has no effect when --MODE is NEWEVENTS')
     parser.add_argument('--inactive', type = str2bool, nargs = '?', default = False, help = 'Specify if inactive parkruns should be included. Default is False.')
     
     args = parser.parse_args()
@@ -116,7 +117,7 @@ if __name__ == '__main__':
     p = []
     procs = []
     for i in range(processes):
-        p.append(Worker(workQueue, r, i, mode, config, args.delay))
+        p.append(Worker(workQueue, r, i, mode, config, args.delay, args.year))
         p[i].start()
         procs.append(ProcInfo(i, p[i].pid))
     

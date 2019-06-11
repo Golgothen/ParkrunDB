@@ -22,7 +22,7 @@ class Mode(Enum):
         return cls.NORMAL
 
 class Worker(multiprocessing.Process):
-    def __init__(self, q, m, i, mode, config, delay):
+    def __init__(self, q, m, i, mode, config, delay, year):
         super(Worker, self).__init__()
         self.inQ = q  #input Queue
         self.msgQ = m  #message queue
@@ -30,6 +30,7 @@ class Worker(multiprocessing.Process):
         self.mode = mode
         self.config = config
         self.delay = delay
+        self.year = year
         #self.loggingQueue = loggingQueue
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         
@@ -108,9 +109,10 @@ class Worker(multiprocessing.Process):
                             else:
                                 self.logger.debug('getEvent found no runners')
                         if not c.checkParkrunVolunteers(row):
-                            self.logger.info('Parkrun {} event {}: volunteers did not match - reimporting.'.format(parkrun['EventURL'], row['EventNumber']))
-                            self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                            self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
+                            if row['EventDate'].year == self.year or self.year == 0:
+                                self.logger.info('Parkrun {} event {}: volunteers did not match - reimporting.'.format(parkrun['EventURL'], row['EventNumber']))
+                                self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                                self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
             if runnersAdded:
@@ -135,7 +137,7 @@ class Worker(multiprocessing.Process):
                     self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
                     return None
                 self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
-                sleep(1)
+                sleep(self.delay)
             except:
                 self.logger.warning('Unexpected network error. URL: ' + url)
                 self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
@@ -355,21 +357,24 @@ class Worker(multiprocessing.Process):
                 found = False
                 retry = 0
                 athletepage = None
-                while not found or retry < 3:
+                while not found and retry < 3:
                     athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
                     if athletepage is not None:
                         found = True
                     else:
                         retry += 1
                         self.logger.warning("URL Error for athlete {} on attempt {}".format(v['AthleteID'], retry))
-                        sleep(2)
-                if athletePage is None:
+                        sleep(self.delay)
+                if athletepage is None:
                     self.logger.error("Failed to retrieve athlete stats for {} {} ({}), Skipping".format(v['FirstName'], v['LastName'], v['AthleteID']))
+                    continue
                 if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
                     if athletepage.xpath('//*[@id="content"]/div[4]')[0].getchildren()[0].text == 'Volunteer Summary':
                         table = athletepage.xpath('//*[@id="results"]/tbody')[2]
                     else:
                         self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
+                if v != volunteers[-1]:
+                    sleep(self.delay)
             if table is not None:
                 for r in table.getchildren():
                     if int(r.getchildren()[0].text) == date.year:
@@ -381,8 +386,6 @@ class Worker(multiprocessing.Process):
                             v['Volunteer'][al['VolunteerPosition']] -= al['Count']
                             if v['Volunteer'][al['VolunteerPosition']] == 0:
                                 del v['Volunteer'][al['VolunteerPosition']]
-                if v != volunteers[-1]:
-                    sleep(2)
         
         #Search results for volunteer athlete ID's that appear in the results
         req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
@@ -407,11 +410,11 @@ class Worker(multiprocessing.Process):
         for v in volunteers:
             try:
                 a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-                self.logger.debug(a)
+                #self.logger.debug(a)
             except StopIteration:
                 v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
         
-        # TODO: Locate tail walkers correctly from the rear of the field
+        # Locate tail walkers correctly from the rear of the field
         found = True
         while found:
             found = False
