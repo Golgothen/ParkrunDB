@@ -1,1 +1,1 @@
-python parkrundl.py --processes 1 --delay 2 --country australia --year 2019
+python parkrundl.py --processes 1 --delay 2 --country australia --year 2019 --volunteer yes
