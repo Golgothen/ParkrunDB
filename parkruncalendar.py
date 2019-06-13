@@ -73,11 +73,11 @@ if __name__ == '__main__':
                         currentdate = e.getchildren()[0].text[:-2]
                 if e.getchildren()[0].tag == 'a':
                     event = e.getchildren()[0].text.split(' (')[0]
-                    lists[currentlist].append(((datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')),event))
+                    lists[currentlist].append( ( (datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')), event, '' ) )
             else:
                 #print( list(map(str.strip, e.text.replace('\xa0','').split(','))))
                 for x in [x.split('(')[0].strip() for x in list(map(str.strip, e.text.replace('\xa0','').split(',')))]:
-                    lists[currentlist].append(( (datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')), (x)))
+                    lists[currentlist].append( ( (datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')), (x), '' ) )
     
     logger.debug("Reading Parkrun Cancellations")
     table = lxml.html.fromstring(getURL('https://www.parkrun.com.au/cancellations/')).xpath('//*[@id="content"]/div[1]')[0]
@@ -106,7 +106,11 @@ if __name__ == '__main__':
     for l in lists:
         for i in lists[l]:
             if len(c.execute("SELECT * FROM ParkrunCalendar WHERE ParkrunID = dbo.getParkrunID('{}') AND CalendarID = dbo.getCalendarID('{}') AND CalendarDate = '{}'".format(i[1], l, i[0].strftime('%Y-%m-%d')))) == 0:
-                count += 1
-                c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate, Notes) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), '{}', '{}')".format(i[1], l, i[0].strftime('%Y-%m-%d'),i[2]))
+                try:
+                    c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate, Notes) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), '{}', '{}')".format(i[1], l, i[0].strftime('%Y-%m-%d'),i[2]))
+                    count += 1
+                except pyodbc.IntegrityError:
+                    logger.warning('Error writing calendar record {} for event {} on date {}. Investigate.'.format(l, i[1], i[0].strftime('%Y-%m-%d')))
+                    
     logger.info("Database updated. {} records added.".format(count))
     listener.stop()

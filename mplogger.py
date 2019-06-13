@@ -28,7 +28,7 @@ sender_config = {
             'level':       'INFO',
         },
         'dbconnection': {
-            'level':       'INFO',
+            'level':       'DEBUG',
         },
     },
     'root': {
@@ -54,7 +54,7 @@ listener_config = {
     'handlers': {
         'console': {
             'class':       'logging.StreamHandler',
-            'level':       'ERROR',
+            'level':       'CRITICAL',
             'formatter':   'brief'
         },
         'file': {
