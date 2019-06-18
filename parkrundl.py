@@ -68,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--year', type = int, default = 0, help = 'Download results only for a specific year. Default is all, Has no effect when --MODE is NEWEVENTS')
     parser.add_argument('--inactive', type = str2bool, nargs = '?', default = False, help = 'Specify if inactive parkruns should be included. Default is False.')
     parser.add_argument('--volunteer', type = str2bool, nargs = '?', default = False, help = 'Specify if volunteer information should be included. Default is False.')
+    parser.add_argument('--juniors', type = str2bool, nargs = '?', default = True, help = 'Specify if Junior event information should be included. Default is True.')
     
     args = parser.parse_args()
 
@@ -118,7 +119,7 @@ if __name__ == '__main__':
     p = []
     procs = []
     for i in range(processes):
-        p.append(Worker(workQueue, r, i, mode, config, args.delay, args.year, args.volunteer))
+        p.append(Worker(workQueue, r, i, mode, config, args.delay, args.year, args.volunteer, args.juniors))
         p[i].start()
         procs.append(ProcInfo(i, p[i].pid))
     

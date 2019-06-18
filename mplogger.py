@@ -28,7 +28,7 @@ sender_config = {
             'level':       'INFO',
         },
         'dbconnection': {
-            'level':       'DEBUG',
+            'level':       'INFO',
         },
     },
     'root': {

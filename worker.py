@@ -22,7 +22,7 @@ class Mode(Enum):
         return cls.NORMAL
 
 class Worker(multiprocessing.Process):
-    def __init__(self, q, m, i, mode, config, delay, year, volunteer):
+    def __init__(self, q, m, i, mode, config, delay, year, volunteer, juniors):
         super(Worker, self).__init__()
         self.inQ = q  #input Queue
         self.msgQ = m  #message queue
@@ -32,6 +32,7 @@ class Worker(multiprocessing.Process):
         self.delay = delay
         self.year = year
         self.volunteer = volunteer
+        self.juniors = juniors
         #self.loggingQueue = loggingQueue
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         
@@ -79,9 +80,9 @@ class Worker(multiprocessing.Process):
                             row['EventID'] = eventID
                             c.addParkrunEventPosition(row)
                     if self.volunteer:
-                        self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], row['EventNumber']))
-                        self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                        self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
+                        self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], parkrun['EventNumber']))
+                        self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
+                        self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(parkrun['EventNumber'])), parkrun['EventURL'])
                     sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
@@ -112,11 +113,12 @@ class Worker(multiprocessing.Process):
                                 sleep(self.delay)
                             else:
                                 self.logger.debug('getEvent found no runners')
-                        if not c.checkParkrunVolunteers(row):
-                            if row['EventDate'].year == self.year or self.year == 0:
-                                self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], row['EventNumber']))
-                                self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                                self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
+                        if self.volunteer:
+                            if not c.checkParkrunVolunteers(row):
+                                if row['EventDate'].year == self.year or self.year == 0:
+                                    self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], row['EventNumber']))
+                                    self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
+                                    self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
             if runnersAdded:
