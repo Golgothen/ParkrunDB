@@ -79,10 +79,10 @@ class Worker(multiprocessing.Process):
                         for row in data:
                             row['EventID'] = eventID
                             c.addParkrunEventPosition(row)
-                    if self.volunteer:
-                        self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], parkrun['EventNumber']))
-                        self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
-                        self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(parkrun['EventNumber'])), parkrun['EventURL'])
+                        if self.volunteer:
+                            self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], parkrun['EventNumber']))
+                            self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
+                            self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(parkrun['EventNumber'])), parkrun['EventURL'])
                     sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
