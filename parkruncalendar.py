@@ -66,7 +66,7 @@ if __name__ == '__main__':
             if len(e.getchildren()) > 0:
                 if e.getchildren()[0].tag == 'span':
                     currentmonth = e.getchildren()[0].getchildren()[0].text
-                if e.getchildren()[0].tag == 'strong':
+                if e.getchildren()[0].tag in ['strong', 'b']:
                     if len(e.getchildren()[0].getchildren()) > 0:
                         currentmonth = e.getchildren()[0].getchildren()[0].text
                     else:
