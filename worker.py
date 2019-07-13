@@ -82,7 +82,7 @@ class Worker(multiprocessing.Process):
                         if self.volunteer:
                             self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], parkrun['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
-                            self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(parkrun['EventNumber'])), parkrun['EventURL'])
+                            self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['LatestResultsURL']), parkrun['EventURL'])
                     sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
@@ -320,37 +320,37 @@ class Worker(multiprocessing.Process):
     def getVolunteers(self, root, eventURL):
         c = Connection(self.config)
         
-        volunteerNames = [x.strip() for x in root.xpath('//*[@id="content"]/div[2]/p[1]')[0].text.split(':')[1].split(',')]
+        volunteerNames = root.xpath('//*[@id="content"]/div[2]/p[1]')[0].getchildren()
         volunteers = []
-        parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
-        eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
-        date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
+        try:
+            parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
+            eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
+            date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
+        except ValueError:
+            self.logger.error("Page error for event {}. Skipping.".format(eventURL))
+            return
+        
         results = self.getEventTable(root)
         
-        if volunteerNames[0] == '':
+        if len(volunteerNames) == 0:
             #No volunteer information
-            self.logger.warning('{} event {} has no volunteer information'.format(eventURL, eventnumber))
+            print('{} event {} has no volunteer information'.format(eventURL, eventnumber))
             return
-
+        
         for v in volunteerNames:
             fn = ''
             ln = ''
-            n = v.split()
+            n = v.text.split()
             fn  = n[0]
             del n[0]
             for l in n:
                 ln += l + ' ' 
             fn = fn.replace("'","''").strip()
             ln = ln.replace("'","''").strip()
-            candidates = c.execute("SELECT * FROM getAthleteParkrunVolunteerBestMatch('{}','{}','{}')".format(fn,ln,eventURL))
-            if len(candidates) > 0:
-                volunteers.append(candidates[0])
-            else:
-                self.logger.warning("Could not find suitable candidate for {} {} at {}, event {}".format(fn, ln, eventURL, eventnumber))
-                volunteers.append({'AthleteID': 0, 'FirstName': fn, 'LastName' : ln})
+            volunteers.append({'AthleteID': v.get('href').split('=')[1], 'FirstName': fn, 'LastName' : ln})
         
         # Remove athletes that already have volunteered for this event
-        vl = c.execute("SELECT Athletes.AthleteID, FirstName, LastName FROM EventVolunteers  INNER JOIN Athletes on Athletes.AthleteID = EventVolunteers.AthleteID WHERE EventID = dbo.getEventID('{}', {})".format(parkrun, eventnumber))
+        vl = c.execute("SELECT Athletes.AthleteID, FirstName, LastName FROM EventVolunteers  INNER JOIN Athletes on Athletes.AthleteID = EventVolunteers.AthleteID WHERE EventID = dbo.getEventID('{}', {})".format(eventURL, eventnumber))
         for v in vl:
             volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
             self.logger.info('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
@@ -393,50 +393,51 @@ class Worker(multiprocessing.Process):
                             if v['Volunteer'][al['VolunteerPosition']] == 0:
                                 del v['Volunteer'][al['VolunteerPosition']]
         
-        #Search results for volunteer athlete ID's that appear in the results
-        req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
-        l = []
-        for r in req:
-            l.append(r['VolunteerPosition'])
-        
-        for v in volunteers:
-            try:
-                a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-                if v['AthleteID'] != 0:
-                    v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
-            except StopIteration:
-                pass
-
-        #Remove volunteer positions from people who don't appear in the results
-        req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
-        l = []
-        for r in req:
-            l.append(r['VolunteerPosition'])
-        
-        for v in volunteers:
-            try:
-                a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-                #self.logger.debug(a)
-            except StopIteration:
-                v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
-        
-        # Locate tail walkers correctly from the rear of the field
-        found = True
-        while found:
-            found = False
+        if results is not None:
+            #Search results for volunteer athlete ID's that appear in the results
+            req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
+            l = []
+            for r in req:
+                l.append(r['VolunteerPosition'])
+            
             for v in volunteers:
                 try:
-                    a = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
-                    self.logger.debug(a)
-                    if 'Tail Walker' in v['Volunteer']:
-                        v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
-                        results = results[:-1]
-                        self.logger.info('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
-                        found = True
+                    a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                    if v['AthleteID'] != 0:
+                        v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
                 except StopIteration:
-                    if 'Tail Walker' in v['Volunteer'] and len(v['Volunteer']) > 1:
-                        del v['Volunteer']['Tail Walker']
-                        self.logger.debug('Deleting Tail Walker from {} {}'.format(v['FirstName'], v['LastName']))
+                    pass
+    
+            #Remove volunteer positions from people who don't appear in the results
+            req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
+            l = []
+            for r in req:
+                l.append(r['VolunteerPosition'])
+            
+            for v in volunteers:
+                try:
+                    a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                    #self.logger.debug(a)
+                except StopIteration:
+                    v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
+            
+            # Locate tail walkers correctly from the rear of the field
+            found = True
+            while found:
+                found = False
+                for v in volunteers:
+                    try:
+                        a = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
+                        self.logger.debug(a)
+                        if 'Tail Walker' in v['Volunteer']:
+                            v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
+                            results = results[:-1]
+                            self.logger.info('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
+                            found = True
+                    except StopIteration:
+                        if 'Tail Walker' in v['Volunteer'] and len(v['Volunteer']) > 1:
+                            del v['Volunteer']['Tail Walker']
+                            self.logger.debug('Deleting Tail Walker from {} {}'.format(v['FirstName'], v['LastName']))
         
         #Search for vital roles
         req = c.execute("SELECT VolunteerPosition FROM VolunteerPositions WHERE VolunteerPositions.Required = 1 AND VolunteerPositionID NOT IN (SELECT VolunteerPositionID FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}))".format(eventURL, eventnumber))
@@ -516,6 +517,11 @@ class Worker(multiprocessing.Process):
         while added:
             added = False
             for v in volunteers:
+                if len(c.execute("SELECT * FROM Athletes WHERE AthleteID = {}".format(v['AthleteID']))) == 0:
+                    v['Gender'] = 'M'
+                    v['Age Cat'] = None
+                    v['Club'] = None
+                    c.addAthlete(v)
                 if len(v['Volunteer']) == 1:
                     if len(c.execute("SELECT * FROM VolunteerPositions WHERE VolunteerPosition = '{}'".format(list(v['Volunteer'].keys())[0]))) == 0:
                         self.logger.info("Adding volunteer position {}".format(list(v['Volunteer'].keys())[0]))

@@ -168,7 +168,7 @@ class Connection():
             
     def addAthlete(self, athlete):
         self.logger.debug(athlete)
-        data = self.execute("SELECT AthleteID, FirstName, LastName, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = {}".format(athlete['AthleteID']))
+        data = self.execute("SELECT AthleteID, FirstName, LastName, Gender, AgeCategoryID, ClubID FROM Athletes WHERE AthleteID = {}".format(athlete['AthleteID']))
         self.logger.debug(data)
         if len(data) == 0:
             try:
@@ -194,11 +194,13 @@ class Connection():
                 if data[0]['AgeCategoryID'] != self.getAgeCatID(athlete) or \
                    data[0]['ClubID'] != self.getClub(athlete['Club']) or \
                    data[0]['FirstName'][:50] != athlete['FirstName'][:50] or \
-                   data[0]['LastName'][:50].upper() != xstr(athlete['LastName'][:50].upper()):
+                   data[0]['LastName'][:50].upper() != xstr(athlete['LastName'][:50].upper()) or \
+                   data[0]['Gender'] != self.getAgeCatID(athlete):
                     self.execute("UPDATE Athletes SET AgeCategoryID = " + xstr(self.getAgeCatID(athlete)) + \
                                  ", ClubID = " + xstr(self.getClub(athlete['Club'])) + \
                                  ", FirstName = '" + xstr(athlete['FirstName'][:50]) + "'" + \
                                  ", LastName = '" + xstr(athlete['LastName'][:50]) + "'" + \
+                                 ", Gender = '" + xstr(athlete['Gender']) + "'" + \
                                  " WHERE AthleteID = " + xstr(athlete['AthleteID']))
             
     def addParkrunEventPosition(self, position, addAthlete = True):
