@@ -188,7 +188,7 @@ if __name__ == '__main__':
     inQ = multiprocessing.Queue()
     outQ = multiprocessing.Queue()
     
-    worker = Worker(inQ, outQ, 0, Mode.NORMAL, config, 10)
+    worker = Worker(inQ, outQ, 0, Mode.NORMAL, config, 10, 0, False, False)
     worker.start()
     
     try:
