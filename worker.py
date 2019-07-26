@@ -337,7 +337,7 @@ class Worker(multiprocessing.Process):
         
         if len(volunteerNames) == 0:
             #No volunteer information
-            print('{} event {} has no volunteer information'.format(eventURL, eventnumber))
+            self.logger.warning('{} event {} has no volunteer information'.format(eventURL, eventnumber))
             return
         
         for v in volunteerNames:
