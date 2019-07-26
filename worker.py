@@ -320,6 +320,9 @@ class Worker(multiprocessing.Process):
     def getVolunteers(self, root, eventURL):
         c = Connection(self.config)
         
+        if root is None:
+            return
+        
         volunteerNames = root.xpath('//*[@id="content"]/div[2]/p[1]')[0].getchildren()
         volunteers = []
         try:
