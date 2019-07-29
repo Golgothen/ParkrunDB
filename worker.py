@@ -66,7 +66,7 @@ class Worker(multiprocessing.Process):
                 parkrun['EventNumber'], parkrun['EventDate'], data = self.getLatestEvent(parkrun['URL'] + parkrun['LatestResultsURL'])
                 if data is not None:
                     runnersAdded = True
-                    self.logger.debug('Event {} got {} events in history'.format(parkrun['EventURL'], len(data)))
+                    self.logger.debug('Event {} got {} runners'.format(parkrun['EventURL'], len(data)))
                     parkrun['Runners'] = len(data)
                     # Add the event if it's a new event
                     # Check the event has the correct number of runners
@@ -350,7 +350,7 @@ class Worker(multiprocessing.Process):
                 ln += l + ' ' 
             fn = fn.replace("'","''").strip()
             ln = ln.replace("'","''").strip()
-            volunteers.append({'AthleteID': v.get('href').split('=')[1], 'FirstName': fn, 'LastName' : ln})
+            volunteers.append({'AthleteID': int(v.get('href').split('=')[1]), 'FirstName': fn, 'LastName' : ln})
         
         # Remove athletes that already have volunteered for this event
         vl = c.execute("SELECT Athletes.AthleteID, FirstName, LastName FROM EventVolunteers  INNER JOIN Athletes on Athletes.AthleteID = EventVolunteers.AthleteID WHERE EventID = dbo.getEventID('{}', {})".format(eventURL, eventnumber))
