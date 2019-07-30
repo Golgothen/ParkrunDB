@@ -110,6 +110,7 @@ class Worker(multiprocessing.Process):
                                 for eRow in eData:
                                     eRow['EventID'] = eventID
                                     c.addParkrunEventPosition(eRow)
+                                self.logger.debug('Sleeping for {} seconds'.format(self.delay))
                                 sleep(self.delay)
                             else:
                                 self.logger.debug('getEvent found no runners')
@@ -119,7 +120,8 @@ class Worker(multiprocessing.Process):
                                     self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], row['EventNumber']))
                                     self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
                                     self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
-                                sleep(self.delay)
+                                    self.logger.debug('Sleeping for {} seconds'.format(self.delay))
+                                    sleep(self.delay)
                 else:
                     self.logger.warning('Parkrun {} returns no history page.'.format(parkrun['Name']))
             if runnersAdded:
