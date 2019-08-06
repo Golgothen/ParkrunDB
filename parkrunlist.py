@@ -12,6 +12,7 @@ class ParkrunList():
         self.logger = logging.getLogger(__name__)
         self.mode = mode
         self.inactive = False
+        self.year = 0
         
     def countries(self, countries, add):
         for c in countries:
@@ -53,10 +54,16 @@ class ParkrunList():
 
     def __update(self, sql, add):
         c = Connection(self.config)
-        if not self.inactive:
-            sql += " where Active = 1"
-        if self.mode == Mode.NEWEVENTS:
+        if not self.inactive or self.year != 0:
+            sql += ' WHERE '
             if not self.inactive:
+                sql += "Active = 1"
+            if self.year != 0:
+                if not self.inactive:
+                    sql += ' AND '
+                sql += 'datepart(year,LaunchDate) <= {}'.format(self.year)
+        if self.mode == Mode.NEWEVENTS:
+            if not self.inactive or self.year != 0:
                 sql += ' AND (LastUpdated < dateadd(day, -3, getdate()) or LastUpdated IS NULL)'
             else:
                 sql += ' WHERE (LastUpdated < dateadd(day, -3, getdate()) or LastUpdated IS NULL)'

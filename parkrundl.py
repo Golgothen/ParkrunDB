@@ -91,6 +91,7 @@ if __name__ == '__main__':
     #First, build a list of events that need to be checked.
     l = ParkrunList(config, mode)
     l.inactive = args.inactive
+    l.year = args.year
     if args.country is not None: l.countries(args.country, True)
     if args.region is not None: l.regions(args.region, True)
     if args.event is not None: l.events(args.event, True)
