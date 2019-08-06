@@ -48,7 +48,7 @@ if __name__ == '__main__':
     
     c = Connection(config)
     logger.debug("Reading Parkrun Calendar")
-    table = lxml.html.fromstring(getURL('https://email.parkrun.com/t/i-l-pmttz-ntrktsur-m/')).xpath('/html/body/section[1]/div/div[1]/div[1]/div/div[4]')[0]
+    table = lxml.html.fromstring(getURL('https://email.parkrun.com/t/i-l-pthlkg-ntrktsur-m/')).xpath('/html/body/section[1]/div/div[1]/div[1]/div/div[4]')[0]
     logger.debug("Parkrun Calendar read")
     lists = {}
     
