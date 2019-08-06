@@ -376,6 +376,7 @@ class Worker(multiprocessing.Process):
                     else:
                         retry += 1
                         self.logger.warning("URL Error for athlete {} on attempt {}".format(v['AthleteID'], retry))
+                        self.logger.debug('Sleeping {} seconds...'.format(self.delay))
                         sleep(self.delay)
                 if athletepage is None:
                     self.logger.error("Failed to retrieve athlete stats for {} {} ({}), Skipping".format(v['FirstName'], v['LastName'], v['AthleteID']))
@@ -386,6 +387,7 @@ class Worker(multiprocessing.Process):
                     else:
                         self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
                 if v != volunteers[-1]:
+                    self.logger.debug('Sleeping {} seconds...'.format(self.delay))
                     sleep(self.delay)
             if table is not None:
                 for r in table.getchildren():
