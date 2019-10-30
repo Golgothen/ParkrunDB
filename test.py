@@ -52,16 +52,6 @@ def getEventTable(root):
     for row in rows:
         d = {}
         for h, v in zip(headings, row.getchildren()):
-            if h == ['Time']:
-                data = v.getchildren()[0].text
-                if data is not None:
-                    if len(data)<6:
-                        data = '0:' + data
-                d[h] = data
-                
-                # 30/11/19 - Note is now inside the Name cell
-                d['Note'] = v.getchildren()[1].getchildren()[0].text
-                print(d)
             # 30/10/19 - Remained unchanged
             if h == 'Pos':
                 d[h] = int(v.text)
@@ -94,6 +84,14 @@ def getEventTable(root):
                     d['FirstName'] = 'Unknown'
                     d['LastName'] = None
                     d['AthleteID'] = 0
+                    break
+                print(d)
+            if h == 'Gender':
+                #30/10/19 - Gender also holds Gender Pos.
+                if v.getchildren()[0].text.strip() is not None:
+                    d[h]=v.getchildren()[0].text.strip()[0]
+                else:
+                    d[h]='M'
                 print(d)
             if h == 'Age Cat':
                 if len(v.getchildren())>0:
@@ -104,21 +102,24 @@ def getEventTable(root):
                     d['Age Cat'] = None
                     d['Age Grade'] = None
                 print(d)
-            if h == 'Gender':
-                #30/10/19 - Gender also holds Gender Pos.
-                if v.getchildren()[0].text.strip() is not None:
-                    d[h]=v.getchildren()[0].text.strip()[0]
-                else:
-                    d[h]='M'
-                print(d)
             if h == 'Club':
                 if len(v.getchildren())>0:
                     if v.getchildren()[0].getchildren()[0].text is not None:
-                        d[h]=v.getchildren()[0].text.replace("'","''")
+                        d[h]=v.getchildren()[0].getchildren()[0].text.replace("'","''")
                     else:
                         d[h]=None
                 else:
                     d[h]=None
+                print(d)
+            if h == ['Time']:
+                data = v.getchildren()[0].text
+                if data is not None:
+                    if len(data)<6:
+                        data = '0:' + data
+                d[h] = data
+                
+                # 30/11/19 - Note is now inside the Name cell
+                d['Note'] = v.getchildren()[1].getchildren()[0].text
                 print(d)
         results.append(d)
     if len(results) > 0:

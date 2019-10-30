@@ -16,7 +16,7 @@ sender_config = {
             'level':       'INFO',
         },
         'checkhistory': {
-            'level':       'INFO',
+            'level':       'DEBUG',
         },
         'worker': {
             'level':       'DEBUG',
@@ -28,7 +28,7 @@ sender_config = {
             'level':       'INFO',
         },
         'dbconnection': {
-            'level':       'INFO',
+            'level':       'DEBUG',
         },
     },
     'root': {

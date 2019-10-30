@@ -156,7 +156,7 @@ class Worker(multiprocessing.Process):
         return lxml.html.fromstring(temp) 
     
     def getEventTable(self, root):
-        
+    
         table = root.xpath('//*[@id="content"]/div[2]/table')[0]
         
         headings = ['Pos','parkrunner','Gender','Age Cat','Club','Time']#,'Age Grade','Gender Pos','Note',] #'Strava']
@@ -171,21 +171,11 @@ class Worker(multiprocessing.Process):
         #        headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note']#,'Strava']
         #else:
         #    headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note'] #,'Strava']
-        data = []
+        results = []
         
         for row in rows:
             d = {}
             for h, v in zip(headings, row.getchildren()):
-                if h == ['Time']:
-                    data = v.getchildren()[0].text
-                    if data is not None:
-                        if len(data)<6:
-                            data = '0:' + data
-                    d[h] = data
-                    
-                    # 30/11/19 - Note is now inside the Name cell
-                    d['Note'] = v.getchildren()[1].getchildren()[0].text
-                
                 # 30/10/19 - Remained unchanged
                 if h == 'Pos':
                     d[h] = int(v.text)
@@ -198,22 +188,32 @@ class Worker(multiprocessing.Process):
                 #        d[h]=None
                 
                 if h == 'parkrunner':
-                    if len(v.getchildren())>0:
-                        d['FirstName'] = v.getchildren()[0].getchildren()[0].text.split()[0].replace("'","''")
+                    if len(v.getchildren()[0].getchildren())>0:
+                        data = v.getchildren()[0].getchildren()[0].text
+                        d['FirstName'] = data.split()[0].replace("'","''")
                         lastName = ''
-                        for i in range(1, len(v.getchildren()[0].getchildren()[0].text.split())):
-                            lastName += v.getchildren()[0].getchildren()[0].text.split()[i].capitalize().replace("'","''") + ' '
+                        l = data.split()
+                        l.pop(0)
+                        for i in l:
+                            lastName += i.capitalize().replace("'","''") + ' '
                         if lastName != '':
                             d['LastName'] = lastName.strip()
                         else:
                             d['LastName'] = ''
-                        d['AthleteID'] = int(v.getchildren()[0].get('href').split('=')[1])
+                        d['AthleteID'] = int(v.getchildren()[0].getchildren()[0].get('href').split('=')[1])
                     else:
                         # Unknown Athlete
                         # 30/10/19 - Untested!
-                        d['FirstName'] = v.text.replace("'","''")
+                        d['FirstName'] = 'Unknown'
                         d['LastName'] = None
                         d['AthleteID'] = 0
+                        break
+                if h == 'Gender':
+                    #30/10/19 - Gender also holds Gender Pos.
+                    if v.getchildren()[0].text.strip() is not None:
+                        d[h]=v.getchildren()[0].text.strip()[0]
+                    else:
+                        d[h]='M'
                 if h == 'Age Cat':
                     if len(v.getchildren())>0:
                         # 30/10/19 - Age Category and Age Grade are now in the same cell
@@ -222,27 +222,30 @@ class Worker(multiprocessing.Process):
                     else:
                         d['Age Cat'] = None
                         d['Age Grade'] = None
-                if h == 'Gender':
-                    #30/10/19 - Gender also holds Gender Pos.
-                    if v.getchildren()[0].text.strip() is not None:
-                        d[h]=v.getchildren()[0].text.strip()[0]
-                    else:
-                        d[h]='M'
                 if h == 'Club':
                     if len(v.getchildren())>0:
                         if v.getchildren()[0].getchildren()[0].text is not None:
-                            d[h]=v.getchildren()[0].text.replace("'","''")
+                            d[h]=v.getchildren()[0].getchildren()[0].text.replace("'","''")
                         else:
                             d[h]=None
                     else:
                         d[h]=None
-            data.append(d)
-        if len(data) > 0:
-            if 'Pos' not in data[0].keys():
-                data = sorted(data, key=lambda k: '0:00:00' if k['Time'] is None else k['Time'])
-                for i in range(len(data)):
-                    data[i]['Pos'] = i + 1
-            return data
+                if h == ['Time']:
+                    data = v.getchildren()[0].text
+                    if data is not None:
+                        if len(data)<6:
+                            data = '0:' + data
+                    d[h] = data
+                    
+                    # 30/11/19 - Note is now inside the Name cell
+                    d['Note'] = v.getchildren()[1].getchildren()[0].text
+            results.append(d)
+        if len(results) > 0:
+            if 'Pos' not in results[0].keys():
+                results = sorted(results, key=lambda k: '0:00:00' if k['Time'] is None else k['Time'])
+                for i in range(len(results)):
+                    results[i]['Pos'] = i + 1
+            return results
         else:
             return None
     
@@ -335,9 +338,10 @@ class Worker(multiprocessing.Process):
         volunteerNames = root.xpath('//*[@id="content"]/div[3]/p[1]')[0].getchildren()
         volunteers = []
         try:
-            parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
-            eventnumber = int(root.xpath('//*[@id="content"]/h2')[0].text.strip().split('#')[1].strip().split()[0])
-            date = datetime.strptime(root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' -')[1].strip(),'%d/%m/%Y')
+                                  
+            parkrun = root.xpath('//*[@id="content"]/div[2]/div[1]/h1')[0].text.strip().split(' parkrun')[0]
+            eventnumber = int(root.xpath('//*[@id="content"]/div[2]/div[1]/h3/span[2]')[0].text.strip().split('#')[1].strip().split()[0])
+            date = datetime.strptime(root.xpath('//*[@id="content"]/div[2]/div[1]/h3')[0].text,'%d/%m/%Y')
         except ValueError:
             self.logger.error("Page error for event {}. Skipping.".format(eventURL))
             return
