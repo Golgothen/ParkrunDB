@@ -157,74 +157,80 @@ class Worker(multiprocessing.Process):
     
     def getEventTable(self, root):
         
-        table = root.xpath('//*[@id="results"]')[0]
+        table = root.xpath('//*[@id="content"]/div[2]/table')[0]
         
-        headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note',] #'Strava']
+        headings = ['Pos','parkrunner','Gender','Age Cat','Club','Time']#,'Age Grade','Gender Pos','Note',] #'Strava']
         
         rows = table.xpath('//tbody/tr')
         
-        if len(rows) > 0:
-            if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
-                headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note']#,'Strava']
-        else:
-            headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note'] #,'Strava']
+        # 30/10/19 - Changes to parkrun website has required an overhaul of this code...
+        
+        # 30/10/19 - Tables now only have 6 cells.  Untested on international sites
+        #if len(rows) > 0:
+        #    if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
+        #        headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note']#,'Strava']
+        #else:
+        #    headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note'] #,'Strava']
         data = []
         
         for row in rows:
             d = {}
             for h, v in zip(headings, row.getchildren()):
-                if h in ['Time','Note']:
-                    d[h]=v.text
-                    if h == 'Time':
-                        if d[h] is not None:
-                            if len(d[h])<6:
-                                d[h] = '0:' + d[h]
+                if h == ['Time']:
+                    data = v.getchildren()[0].text
+                    if data is not None:
+                        if len(data)<6:
+                            data = '0:' + data
+                    d[h] = data
+                    
+                    # 30/11/19 - Note is now inside the Name cell
+                    d['Note'] = v.getchildren()[1].getchildren()[0].text
+                
+                # 30/10/19 - Remained unchanged
                 if h == 'Pos':
-                    d[h]=int(v.text)
-                if h == 'Age Grade':
-                    if v.text is not None:
-                        d[h]=float(v.text.split()[0])
-                    else:
-                        d[h]=None
+                    d[h] = int(v.text)
+                
+                # 30/10/19 - Age Grade is now included in Age Category cell.  Pull it out there instead.
+                #if h == 'Age Grade':
+                #    if v.text is not None:
+                #        d[h]=float(v.text.split()[0])
+                #    else:
+                #        d[h]=None
+                
                 if h == 'parkrunner':
                     if len(v.getchildren())>0:
-                        d['FirstName']=v.getchildren()[0].text.split()[0].replace("'","''")
+                        d['FirstName'] = v.getchildren()[0].getchildren()[0].text.split()[0].replace("'","''")
                         lastName = ''
-                        for i in range(1, len(v.getchildren()[0].text.split())):
-                            lastName+=v.getchildren()[0].text.split()[i].capitalize().replace("'","''") + ' '
+                        for i in range(1, len(v.getchildren()[0].getchildren()[0].text.split())):
+                            lastName += v.getchildren()[0].getchildren()[0].text.split()[i].capitalize().replace("'","''") + ' '
                         if lastName != '':
                             d['LastName'] = lastName.strip()
                         else:
                             d['LastName'] = ''
-                        d['AthleteID']=int(v.getchildren()[0].get('href').split('=')[1])
+                        d['AthleteID'] = int(v.getchildren()[0].get('href').split('=')[1])
                     else:
-                        d['FirstName']=v.text.replace("'","''")
-                        d['LastName']=None
-                        d['AthleteID']=0
-                #if h == 'Strava':
-                #    if len(v.getchildren())>0:
-                #        added = False
-                #        for c in v.getchildren():
-                #            if 'strava' in c.get('href'):
-                #                d['StravaID']=c.get('href').split('/')[4]
-                #                added = True
-                #        if not added:
-                #            d['StravaID']=None
-                #    else:
-                #        d['StravaID']=None
+                        # Unknown Athlete
+                        # 30/10/19 - Untested!
+                        d['FirstName'] = v.text.replace("'","''")
+                        d['LastName'] = None
+                        d['AthleteID'] = 0
                 if h == 'Age Cat':
                     if len(v.getchildren())>0:
-                        d[h]=v.getchildren()[0].text
+                        # 30/10/19 - Age Category and Age Grade are now in the same cell
+                        d['Age Cat'] = v.getchildren()[0].getchildren()[0].text
+                        d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
                     else:
-                        d[h]=None
+                        d['Age Cat'] = None
+                        d['Age Grade'] = None
                 if h == 'Gender':
-                    if v.text is not None:
-                        d[h]=v.text
+                    #30/10/19 - Gender also holds Gender Pos.
+                    if v.getchildren()[0].text.strip() is not None:
+                        d[h]=v.getchildren()[0].text.strip()[0]
                     else:
                         d[h]='M'
                 if h == 'Club':
                     if len(v.getchildren())>0:
-                        if v.getchildren()[0].text is not None:
+                        if v.getchildren()[0].getchildren()[0].text is not None:
                             d[h]=v.getchildren()[0].text.replace("'","''")
                         else:
                             d[h]=None
@@ -326,7 +332,7 @@ class Worker(multiprocessing.Process):
         if root is None:
             return
         
-        volunteerNames = root.xpath('//*[@id="content"]/div[2]/p[1]')[0].getchildren()
+        volunteerNames = root.xpath('//*[@id="content"]/div[3]/p[1]')[0].getchildren()
         volunteers = []
         try:
             parkrun = root.xpath('//*[@id="content"]/h2')[0].text.strip().split(' parkrun')[0]
