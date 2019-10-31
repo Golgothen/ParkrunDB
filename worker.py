@@ -207,6 +207,10 @@ class Worker(multiprocessing.Process):
                         d['FirstName'] = 'Unknown'
                         d['LastName'] = None
                         d['AthleteID'] = 0
+                        d['Time'] = None
+                        d['Age Cat'] = None
+                        d['Age Grade'] = None
+                        d['Club']=None
                         break
                 if h == 'Gender':
                     #30/10/19 - Gender also holds Gender Pos.
@@ -235,7 +239,7 @@ class Worker(multiprocessing.Process):
                     if data is not None:
                         if len(data)<6:
                             data = '0:' + data
-                    d[h] = data
+                    d['Time'] = data
                     
                     # 30/11/19 - Note is now inside the Name cell
                     d['Note'] = v.getchildren()[1].getchildren()[0].text
@@ -281,16 +285,16 @@ class Worker(multiprocessing.Process):
             return 0, None, None
         
         try:
-            eventHTML = root.xpath('//*[@id="content"]/h2')[0].text
+            eventElement = root.xpath('//*[@id="content"]/div[2]/div[1]/h3')[0]
         except IndexError:
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible page error retrieving url ' + url))
             return 0, None, None
 
-        if len(eventHTML.split('#')[1].split('-')[0].strip()) == 0:
-            return 0, None, None
-        eventNumber =  int(eventHTML.split('#')[1].split('-')[0].strip())
-        eventDate = datetime.strptime(eventHTML[len(eventHTML)-10:],'%d/%m/%Y')
+        #if len(eventHTML.split('#')[1].split('-')[0].strip()) == 0:
+        #    return 0, None, None
+        eventNumber =  int(eventElement.getchildren()[1].text.split('#')[1].strip())
+        eventDate = datetime.strptime(eventElement.text,'%d/%m/%Y')
         
         return eventNumber, eventDate, self.getEventTable(root)
 
