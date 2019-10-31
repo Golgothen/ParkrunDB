@@ -234,7 +234,7 @@ class Worker(multiprocessing.Process):
                             d[h]=None
                     else:
                         d[h]=None
-                if h == ['Time']:
+                if h == 'Time':
                     data = v.getchildren()[0].text
                     if data is not None:
                         if len(data)<6:

@@ -73,7 +73,7 @@ def getEvent(url, parkrunEvent):
     return getEventTable(table)
 
 def getEventTable(root):
-
+    
     table = root.xpath('//*[@id="content"]/div[2]/table')[0]
     
     headings = ['Pos','parkrunner','Gender','Age Cat','Club','Time']#,'Age Grade','Gender Pos','Note',] #'Strava']
@@ -96,6 +96,7 @@ def getEventTable(root):
             # 30/10/19 - Remained unchanged
             if h == 'Pos':
                 d[h] = int(v.text)
+                print(d)
             
             # 30/10/19 - Age Grade is now included in Age Category cell.  Pull it out there instead.
             #if h == 'Age Grade':
@@ -125,12 +126,14 @@ def getEventTable(root):
                     d['LastName'] = None
                     d['AthleteID'] = 0
                     break
+                print(d)
             if h == 'Gender':
                 #30/10/19 - Gender also holds Gender Pos.
                 if v.getchildren()[0].text.strip() is not None:
                     d[h]=v.getchildren()[0].text.strip()[0]
                 else:
                     d[h]='M'
+                print(d)
             if h == 'Age Cat':
                 if len(v.getchildren())>0:
                     # 30/10/19 - Age Category and Age Grade are now in the same cell
@@ -139,6 +142,7 @@ def getEventTable(root):
                 else:
                     d['Age Cat'] = None
                     d['Age Grade'] = None
+                print(d)
             if h == 'Club':
                 if len(v.getchildren())>0:
                     if v.getchildren()[0].getchildren()[0].text is not None:
@@ -147,15 +151,17 @@ def getEventTable(root):
                         d[h]=None
                 else:
                     d[h]=None
-            if h == ['Time']:
+                print(d)
+            if h == 'Time':
                 data = v.getchildren()[0].text
                 if data is not None:
                     if len(data)<6:
                         data = '0:' + data
-                d[h] = data
+                d['Time'] = data
                 
                 # 30/11/19 - Note is now inside the Name cell
                 d['Note'] = v.getchildren()[1].getchildren()[0].text
+                print(d)
         results.append(d)
     if len(results) > 0:
         if 'Pos' not in results[0].keys():

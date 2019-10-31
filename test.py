@@ -55,7 +55,6 @@ def getEventTable(root):
         d = {}
         for h, v in zip(headings, row.getchildren()):
             # 30/10/19 - Remained unchanged
-            print(v.values())
             if h == 'Pos':
                 d[h] = int(v.text)
                 print(d)
@@ -114,9 +113,8 @@ def getEventTable(root):
                 else:
                     d[h]=None
                 print(d)
-            if h == ['Time']:
+            if h == 'Time':
                 data = v.getchildren()[0].text
-                print(data)
                 if data is not None:
                     if len(data)<6:
                         data = '0:' + data
@@ -142,8 +140,8 @@ def printv():
         print(v)
     print(len(volunteers))
 
-root = getURL('http://www.parkrun.com.au/altonabeach/results/latestresults/')
-eventURL = 'altonabeach'
+root = getURL('http://www.parkrun.org.uk/huddersfield-juniors/results/weeklyresults/?runSeqNumber=256')
+eventURL = 'huddersfield-juniors'
 
 #def getVolunteers(root):
     
