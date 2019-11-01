@@ -56,7 +56,7 @@ def getEventTable(root):
         for h, v in zip(headings, row.getchildren()):
             # 30/10/19 - Remained unchanged
             if h == 'Pos':
-                d[h] = int(v.text)
+                d['Pos'] = int(v.text)
                 print(d)
             
             # 30/10/19 - Age Grade is now included in Age Category cell.  Pull it out there instead.
@@ -86,14 +86,19 @@ def getEventTable(root):
                     d['FirstName'] = 'Unknown'
                     d['LastName'] = None
                     d['AthleteID'] = 0
+                    d['Time'] = None
+                    d['Age Cat'] = None
+                    d['Age Grade'] = None
+                    d['Club'] = None
+                    d['Note'] = None
                     break
                 print(d)
             if h == 'Gender':
                 #30/10/19 - Gender also holds Gender Pos.
                 if v.getchildren()[0].text.strip() is not None:
-                    d[h]=v.getchildren()[0].text.strip()[0]
+                    d['Gender'] = v.getchildren()[0].text.strip()[0]
                 else:
-                    d[h]='M'
+                    d['Gender']='M'
                 print(d)
             if h == 'Age Cat':
                 if len(v.getchildren())>0:
@@ -109,9 +114,9 @@ def getEventTable(root):
                     if v.getchildren()[0].getchildren()[0].text is not None:
                         d[h]=v.getchildren()[0].getchildren()[0].text.replace("'","''")
                     else:
-                        d[h]=None
+                        d['Club'] = None
                 else:
-                    d[h]=None
+                    d['Club'] = None
                 print(d)
             if h == 'Time':
                 data = v.getchildren()[0].text

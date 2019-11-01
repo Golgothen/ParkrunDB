@@ -178,7 +178,7 @@ class Worker(multiprocessing.Process):
             for h, v in zip(headings, row.getchildren()):
                 # 30/10/19 - Remained unchanged
                 if h == 'Pos':
-                    d[h] = int(v.text)
+                    d['Pos'] = int(v.text)
                 
                 # 30/10/19 - Age Grade is now included in Age Category cell.  Pull it out there instead.
                 #if h == 'Age Grade':
@@ -210,14 +210,15 @@ class Worker(multiprocessing.Process):
                         d['Time'] = None
                         d['Age Cat'] = None
                         d['Age Grade'] = None
-                        d['Club']=None
+                        d['Club'] = None
+                        d['Note'] = None
                         break
                 if h == 'Gender':
                     #30/10/19 - Gender also holds Gender Pos.
                     if v.getchildren()[0].text.strip() is not None:
-                        d[h]=v.getchildren()[0].text.strip()[0]
+                        d['Gender'] = v.getchildren()[0].text.strip()[0]
                     else:
-                        d[h]='M'
+                        d['Gender'] = 'M'
                 if h == 'Age Cat':
                     if len(v.getchildren())>0:
                         # 30/10/19 - Age Category and Age Grade are now in the same cell
@@ -229,11 +230,11 @@ class Worker(multiprocessing.Process):
                 if h == 'Club':
                     if len(v.getchildren())>0:
                         if v.getchildren()[0].getchildren()[0].text is not None:
-                            d[h]=v.getchildren()[0].getchildren()[0].text.replace("'","''")
+                            d[h] = v.getchildren()[0].getchildren()[0].text.replace("'","''")
                         else:
-                            d[h]=None
+                            d[h] = None
                     else:
-                        d[h]=None
+                        d[h] = None
                 if h == 'Time':
                     data = v.getchildren()[0].text
                     if data is not None:
@@ -241,7 +242,7 @@ class Worker(multiprocessing.Process):
                             data = '0:' + data
                     d['Time'] = data
                     
-                    # 30/11/19 - Note is now inside the Name cell
+                    # 30/11/19 - Note is now inside the Time cell
                     d['Note'] = v.getchildren()[1].getchildren()[0].text
             results.append(d)
         if len(results) > 0:
