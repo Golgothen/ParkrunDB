@@ -35,7 +35,7 @@ def getURL(url):
     while not completed:
         try:
             logger.debug('Hitting {}'.format(url))
-            f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'}))
+            f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}))
             completed = True
         except HTTPError as e:
             logger.warning('Got HTTP Error {}'.format(e.code))
@@ -44,33 +44,33 @@ def getURL(url):
                 return None
             if e.code == 403:
                 #self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
-                raise
-                #return None
+                return None
             #self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
-            sleep(1)
+            sleep(5)
         except:
             logger.warning('Unexpected network error. URL: ' + url)
             #self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
             return None
     temp = f.read().decode('utf-8', errors='ignore')
-    logger.debug('URL returned string of length {}'.format(len(temp)))
-    return temp 
+    #self.logger.debug('URL returned string of length {}'.format(len(temp)))
+    return lxml.html.fromstring(temp) 
 
 def getEvent(url, parkrunEvent):
     logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
-    html = getURL(url + str(parkrunEvent))
+    root = getURL(url + str(parkrunEvent))
+    #logger.debug(root)
     #Test if we got a valid response'
-    if html is None:  #most likely a 404 error
+    if root is None:  #most likely a 404 error
         logger.warning('Error retrieving event')
-        #self.msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url))
+        #msgQ.put(Message('Error', self.id, 'Error getting event. Check url ' + url + str(parkrunEvent)))
         return None
-    if '<h1>Something odd has happened, so here are the most first finishers</h1>' in html:  
+    #logger.debug('GetURL did not return None')
+    if len(root.xpath('//*[@id="content"]/h1')) > 0:
         logger.warning('Error retrieving event')
-        #self.msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url))
+        #msgQ.put(Message('Error', self.id, 'Possible URL error getting event. Check url ' + url + str(parkrunEvent)))
         return None
-    html = '<table' + html.split('<table')[1].split('</p>')[0]
-    table = lxml.html.fromstring(html)
-    return getEventTable(table)
+    #logger.debug('GetURL did not return an error page')
+    return getEventTable(root)
 
 def getEventTable(root):
     
@@ -95,8 +95,8 @@ def getEventTable(root):
         for h, v in zip(headings, row.getchildren()):
             # 30/10/19 - Remained unchanged
             if h == 'Pos':
-                d[h] = int(v.text)
-                print(d)
+                d['Pos'] = int(v.text)
+                #print(d)
             
             # 30/10/19 - Age Grade is now included in Age Category cell.  Pull it out there instead.
             #if h == 'Age Grade':
@@ -125,33 +125,41 @@ def getEventTable(root):
                     d['FirstName'] = 'Unknown'
                     d['LastName'] = None
                     d['AthleteID'] = 0
+                    d['Time'] = None
+                    d['Age Cat'] = None
+                    d['Age Grade'] = None
+                    d['Club'] = None
+                    d['Note'] = None
                     break
-                print(d)
+                #print(d)
             if h == 'Gender':
                 #30/10/19 - Gender also holds Gender Pos.
                 if v.getchildren()[0].text.strip() is not None:
-                    d[h]=v.getchildren()[0].text.strip()[0]
+                    d['Gender'] = v.getchildren()[0].text.strip()[0]
                 else:
-                    d[h]='M'
-                print(d)
+                    d['Gender']='M'
+                #print(d)
             if h == 'Age Cat':
                 if len(v.getchildren())>0:
                     # 30/10/19 - Age Category and Age Grade are now in the same cell
                     d['Age Cat'] = v.getchildren()[0].getchildren()[0].text
-                    d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
+                    if len(v.getchildren()) > 1:
+                        d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
+                    else:
+                        d['Age Grade'] = None
                 else:
                     d['Age Cat'] = None
                     d['Age Grade'] = None
-                print(d)
+                #print(d)
             if h == 'Club':
                 if len(v.getchildren())>0:
                     if v.getchildren()[0].getchildren()[0].text is not None:
                         d[h]=v.getchildren()[0].getchildren()[0].text.replace("'","''")
                     else:
-                        d[h]=None
+                        d['Club'] = None
                 else:
-                    d[h]=None
-                print(d)
+                    d['Club'] = None
+                #print(d)
             if h == 'Time':
                 data = v.getchildren()[0].text
                 if data is not None:
@@ -161,7 +169,7 @@ def getEventTable(root):
                 
                 # 30/11/19 - Note is now inside the Name cell
                 d['Note'] = v.getchildren()[1].getchildren()[0].text
-                print(d)
+                #print(d)
         results.append(d)
     if len(results) > 0:
         if 'Pos' not in results[0].keys():
@@ -220,19 +228,22 @@ if __name__ == '__main__':
             logger.debug("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
             html = getURL(baseURL.format(athlete['AthleteID']))
             try:
-                runcount = int(html.split('<h2>')[1].split('<br/>')[0].split(' runs at All Events')[0].split(' ')[-1])
-                logger.debug("Runcount = {}".format(runcount))
+                runcount = int(html.xpath('//*[@id="content"]/h2/text()[1]')[0].split(' runs at All Events')[0].split(' ')[-1])
+                logger.debug("Website says Runcount = {}".format(runcount))
             except (ValueError, IndexError, AttributeError):
                 print("Error reading run count for Athlete {}".format(athlete['AthleteID']))
                 logger.warning("Error reading run count for Athlete {}".format(athlete['AthleteID']))
                 continue
             if athlete['EventCount'] != runcount:
                 eventsMissing = runcount - athlete['EventCount']
-                rows = lxml.html.fromstring('<table' + html.split('<table')[3].split('</table>')[0] + '</table>').xpath('//tbody/tr')
+                table = html.xpath('//*[@id="results"]')[0]
+                rows = table.xpath('//tbody/tr')
                 hist_data = c.execute("SELECT * FROM getAthleteEventHistory({})".format(athlete['AthleteID']))
                 if eventsMissing > 0:
                     logger.debug("Athlete {} Missing {} runs".format(athlete['AthleteID'], eventsMissing))
                     for row in rows:  # Iterate through the events in the summary table
+                        if len(row) < 7:
+                            continue
                         parkrun = {}
                         position = {}
                         try:
@@ -257,8 +268,8 @@ if __name__ == '__main__':
                             print("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['EventURL'], parkrun['EventNumber'], athlete['AthleteID']))
                             logger.warning("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['EventURL'], parkrun['EventNumber'], athlete['AthleteID']))
                             continue
-                        logger.debug(parkrun)
-                        logger.debug(position)
+                        #logger.debug(parkrun)
+                        #logger.debug(position)
                         found = False
                         for d in hist_data:
                             if d['URL'] == parkrun['EventURL'] and d['EventNumber'] == parkrun['EventNumber']:
@@ -311,8 +322,10 @@ if __name__ == '__main__':
                     for d in hist_data:
                         found = False
                         for row in rows:
-                            if d['URL'] == row.getchildren()[0].getchildren()[0].get('href').split('/')[3] and \
-                               d['EventNumber'] == int(row.getchildren()[2].getchildren()[0].get('href').split('=')[1]):
+                            if len(row) < 7:
+                                continue
+                            if d['URL'] == row[0][0].get('href').split('/')[3] and \
+                               d['EventNumber'] == int(row[2][0].get('href').split('=')[1]):
                                 found = True
                                 break
                         if not found:
@@ -325,7 +338,7 @@ if __name__ == '__main__':
                                     c.addParkrunEventPosition(edata)
                                 logger.debug("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['URL']))
                                 eventsMissing += 1
-                            sleep(10)
+                            sleep(delay)
                     if eventsMissing == 0:
                         #c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
                         logger.info("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
