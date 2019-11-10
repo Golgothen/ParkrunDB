@@ -152,7 +152,7 @@ class Worker(multiprocessing.Process):
                 self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
                 return None
         temp = f.read().decode('utf-8', errors='ignore')
-        #self.logger.debug('URL returned string of length {}'.format(len(temp)))
+        self.logger.debug('URL returned string of length {}'.format(len(temp)))
         return lxml.html.fromstring(temp) 
     
     def getEventTable(self, root):
@@ -223,7 +223,10 @@ class Worker(multiprocessing.Process):
                     if len(v.getchildren())>0:
                         # 30/10/19 - Age Category and Age Grade are now in the same cell
                         d['Age Cat'] = v.getchildren()[0].getchildren()[0].text
-                        d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
+                        if len(v.getchildren()) > 1:
+                            d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
+                        else:
+                            d['Age Grade'] = None
                     else:
                         d['Age Cat'] = None
                         d['Age Grade'] = None
@@ -257,7 +260,7 @@ class Worker(multiprocessing.Process):
     def getEvent(self, url, parkrunEvent):
         self.logger.debug('Hitting {}'.format(url + str(parkrunEvent)))
         root = self.getURL(url + str(parkrunEvent))
-        self.logger.debug(root)
+        #self.logger.debug(root)
         #Test if we got a valid response'
         if root is None:  #most likely a 404 error
             self.logger.warning('Error retrieving event')
