@@ -19,16 +19,16 @@ sender_config = {
             'level':       'DEBUG',
         },
         'worker': {
-            'level':       'DEBUG',
+            'level':       'INFO',
         },
         'parkrunlist': {
             'level':       'INFO',
         },
         'parkruncalendar': {
-            'level':       'INFO',
+            'level':       'DEBUG',
         },
         'dbconnection': {
-            'level':       'DEBUG',
+            'level':       'INFO',
         },
     },
     'root': {
