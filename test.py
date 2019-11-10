@@ -104,7 +104,10 @@ def getEventTable(root):
                 if len(v.getchildren())>0:
                     # 30/10/19 - Age Category and Age Grade are now in the same cell
                     d['Age Cat'] = v.getchildren()[0].getchildren()[0].text
-                    d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
+                    if len(v.getchildren()) > 1:
+                        d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
+                    else:
+                        d['Age Grade'] = None
                 else:
                     d['Age Cat'] = None
                     d['Age Grade'] = None
@@ -145,8 +148,8 @@ def printv():
         print(v)
     print(len(volunteers))
 
-root = getURL('http://www.parkrun.org.uk/huddersfield-juniors/results/weeklyresults/?runSeqNumber=256')
-eventURL = 'huddersfield-juniors'
+root = getURL('http://www.parkrun.com.au/mullummullum/results/latestresults/')
+eventURL = 'mullummullum'
 
 #def getVolunteers(root):
     
