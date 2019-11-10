@@ -89,6 +89,7 @@ class Connection():
         if athlete['Age Cat'] in self.cachedAgeCat:
             return self.cachedAgeCat[athlete['Age Cat']]
         else:
+            self.logger.info(athlete['Age Cat'])
             ageGroup = athlete['Age Cat'][2:]
             if ageGroup == '---':
                 ageCat = 'S'
