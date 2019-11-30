@@ -156,8 +156,7 @@ class Worker(multiprocessing.Process):
         return lxml.html.fromstring(temp) 
     
     def getEventTable(self, root):
-    
-        table = root.xpath('//*[@id="content"]/div[2]/table')[0]
+        table = root.xpath('//*[@id="content"]/div[1]/table')[0]
         
         headings = ['Pos','parkrunner','Gender','Age Cat','Club','Time']#,'Age Grade','Gender Pos','Note',] #'Strava']
         
@@ -190,6 +189,17 @@ class Worker(multiprocessing.Process):
                 if h == 'parkrunner':
                     if len(v.getchildren()[0].getchildren())>0:
                         data = v.getchildren()[0].getchildren()[0].text
+                        if len(data.split()) == 0:
+                            # Unnamed athlete
+                            d['FirstName'] = 'Unknown'
+                            d['LastName'] = None
+                            d['AthleteID'] = 0
+                            d['Time'] = None
+                            d['Age Cat'] = None
+                            d['Age Grade'] = None
+                            d['Club'] = None
+                            d['Note'] = None
+                            break
                         d['FirstName'] = data.split()[0].replace("'","''")
                         lastName = ''
                         l = data.split()
@@ -203,7 +213,6 @@ class Worker(multiprocessing.Process):
                         d['AthleteID'] = int(v.getchildren()[0].getchildren()[0].get('href').split('=')[1])
                     else:
                         # Unknown Athlete
-                        # 30/10/19 - Untested!
                         d['FirstName'] = 'Unknown'
                         d['LastName'] = None
                         d['AthleteID'] = 0
@@ -289,7 +298,7 @@ class Worker(multiprocessing.Process):
             return 0, None, None
         
         try:
-            eventElement = root.xpath('//*[@id="content"]/div[2]/div[1]/h3')[0]
+            eventElement = root.xpath('//*[@id="content"]/div[1]/div[1]/h3')[0]
         except IndexError:
             self.logger.warning('Error retrieving event')
             self.msgQ.put(Message('Error', self.id, 'Possible page error retrieving url ' + url))
@@ -342,14 +351,13 @@ class Worker(multiprocessing.Process):
         
         if root is None:
             return
-        
-        volunteerNames = root.xpath('//*[@id="content"]/div[3]/p[1]')[0].getchildren()
+        volunteerNames = root.xpath('//*[@id="content"]/div[2]/p[1]')[0].getchildren()
         volunteers = []
         try:
                                   
-            parkrun = root.xpath('//*[@id="content"]/div[2]/div[1]/h1')[0].text.strip().split(' parkrun')[0]
-            eventnumber = int(root.xpath('//*[@id="content"]/div[2]/div[1]/h3/span[2]')[0].text.strip().split('#')[1].strip().split()[0])
-            date = datetime.strptime(root.xpath('//*[@id="content"]/div[2]/div[1]/h3')[0].text,'%d/%m/%Y')
+            parkrun = root.xpath('//*[@id="content"]/div[1]/div[1]/h1')[0].text.strip().split(' parkrun')[0]
+            eventnumber = int(root.xpath('//*[@id="content"]/div[1]/div[1]/h3/span[2]')[0].text.strip().split('#')[1].strip().split()[0])
+            date = datetime.strptime(root.xpath('//*[@id="content"]/div[1]/div[1]/h3')[0].text,'%d/%m/%Y')
         except ValueError:
             self.logger.error("Page error for event {}. Skipping.".format(eventURL))
             return
@@ -400,8 +408,11 @@ class Worker(multiprocessing.Process):
                     self.logger.error("Failed to retrieve athlete stats for {} {} ({}), Skipping".format(v['FirstName'], v['LastName'], v['AthleteID']))
                     continue
                 if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
-                    if athletepage.xpath('//*[@id="content"]/div[4]')[0].getchildren()[0].text == 'Volunteer Summary':
-                        table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+                    if len(athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()) > 0:
+                        if athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()[0].text == 'Volunteer Summary':
+                            table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+                        else:
+                            self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
                     else:
                         self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
                 if v != volunteers[-1]:
