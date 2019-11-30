@@ -35,7 +35,7 @@ def getURL(url):
 
 def getEventTable(root):
     
-    table = root.xpath('//*[@id="content"]/div[2]/table')[0]
+    table = root.xpath('//*[@id="content"]/div[1]/table')[0]
     
     headings = ['Pos','parkrunner','Gender','Age Cat','Club','Time']#,'Age Grade','Gender Pos','Note',] #'Strava']
     
@@ -148,8 +148,8 @@ def printv():
         print(v)
     print(len(volunteers))
 
-root = getURL('http://www.parkrun.com.au/mullummullum/results/latestresults/')
-eventURL = 'mullummullum'
+root = getURL('https://www.parkrun.com.au/bannockburnbush/results/latestresults/')
+eventURL = 'bannockburnbush'
 
 #def getVolunteers(root):
     
@@ -161,13 +161,13 @@ if root is None:
     return
 
     
-volunteerNames = root.xpath('//*[@id="content"]/div[3]/p[1]')[0].getchildren()
+volunteerNames = root.xpath('//*[@id="content"]/div[2]/p[1]')[0].getchildren()
 volunteers = []
 try:
                           
-    parkrun = root.xpath('//*[@id="content"]/div[2]/div[1]/h1')[0].text.strip().split(' parkrun')[0]
-    eventnumber = int(root.xpath('//*[@id="content"]/div[2]/div[1]/h3/span[2]')[0].text.strip().split('#')[1].strip().split()[0])
-    date = datetime.strptime(root.xpath('//*[@id="content"]/div[2]/div[1]/h3')[0].text,'%d/%m/%Y')
+    parkrun = root.xpath('//*[@id="content"]/div[1]/div[1]/h1')[0].text.strip().split(' parkrun')[0]
+    eventnumber = int(root.xpath('//*[@id="content"]/div[1]/div[1]/h3/span[2]')[0].text.strip().split('#')[1].strip().split()[0])
+    date = datetime.strptime(root.xpath('//*[@id="content"]/div[1]/div[1]/h3')[0].text,'%d/%m/%Y')
 except ValueError:
     print("Page error for event {}. Skipping.".format(eventURL))
     return
@@ -218,8 +218,11 @@ for v in volunteers:
             print("Failed to retrieve athlete stats for {} {} ({}), Skipping".format(v['FirstName'], v['LastName'], v['AthleteID']))
             continue
         if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
-            if athletepage.xpath('//*[@id="content"]/div[4]')[0].getchildren()[0].text == 'Volunteer Summary':
-                table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+            if len(athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()) > 0:
+                if athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()[0].text == 'Volunteer Summary':
+                    table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+                else:
+                    print("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
             else:
                 print("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
         if v != volunteers[-1]:
