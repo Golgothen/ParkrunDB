@@ -67,7 +67,7 @@ class Connection():
                 c.commit()
                 return None
         except:
-            self.logger.error('Error occured executing statement',exc_info = True, stack_info = True)
+            self.logger.error('Error occured executing statement: {}'.format(sql),exc_info = True, stack_info = True)
             if sql[:6] in ['INSERT', 'DELETE', 'UPDATE']:
                 if c is not None:
                     self.logger.error('Rolling back previous statement')
