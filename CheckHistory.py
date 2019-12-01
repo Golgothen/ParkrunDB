@@ -73,8 +73,7 @@ def getEvent(url, parkrunEvent):
     return getEventTable(root)
 
 def getEventTable(root):
-    
-    table = root.xpath('//*[@id="content"]/div[2]/table')[0]
+    table = root.xpath('//*[@id="content"]/div[1]/table')[0]
     
     headings = ['Pos','parkrunner','Gender','Age Cat','Club','Time']#,'Age Grade','Gender Pos','Note',] #'Strava']
     
@@ -96,7 +95,6 @@ def getEventTable(root):
             # 30/10/19 - Remained unchanged
             if h == 'Pos':
                 d['Pos'] = int(v.text)
-                #print(d)
             
             # 30/10/19 - Age Grade is now included in Age Category cell.  Pull it out there instead.
             #if h == 'Age Grade':
@@ -108,6 +106,17 @@ def getEventTable(root):
             if h == 'parkrunner':
                 if len(v.getchildren()[0].getchildren())>0:
                     data = v.getchildren()[0].getchildren()[0].text
+                    if len(data.split()) == 0:
+                        # Unnamed athlete
+                        d['FirstName'] = 'Unknown'
+                        d['LastName'] = None
+                        d['AthleteID'] = 0
+                        d['Time'] = None
+                        d['Age Cat'] = None
+                        d['Age Grade'] = None
+                        d['Club'] = None
+                        d['Note'] = None
+                        break
                     d['FirstName'] = data.split()[0].replace("'","''")
                     lastName = ''
                     l = data.split()
@@ -121,7 +130,6 @@ def getEventTable(root):
                     d['AthleteID'] = int(v.getchildren()[0].getchildren()[0].get('href').split('=')[1])
                 else:
                     # Unknown Athlete
-                    # 30/10/19 - Untested!
                     d['FirstName'] = 'Unknown'
                     d['LastName'] = None
                     d['AthleteID'] = 0
@@ -131,14 +139,12 @@ def getEventTable(root):
                     d['Club'] = None
                     d['Note'] = None
                     break
-                #print(d)
             if h == 'Gender':
                 #30/10/19 - Gender also holds Gender Pos.
                 if v.getchildren()[0].text.strip() is not None:
                     d['Gender'] = v.getchildren()[0].text.strip()[0]
                 else:
-                    d['Gender']='M'
-                #print(d)
+                    d['Gender'] = 'M'
             if h == 'Age Cat':
                 if len(v.getchildren())>0:
                     # 30/10/19 - Age Category and Age Grade are now in the same cell
@@ -150,16 +156,14 @@ def getEventTable(root):
                 else:
                     d['Age Cat'] = None
                     d['Age Grade'] = None
-                #print(d)
             if h == 'Club':
                 if len(v.getchildren())>0:
                     if v.getchildren()[0].getchildren()[0].text is not None:
-                        d[h]=v.getchildren()[0].getchildren()[0].text.replace("'","''")
+                        d[h] = v.getchildren()[0].getchildren()[0].text.replace("'","''")
                     else:
-                        d['Club'] = None
+                        d[h] = None
                 else:
-                    d['Club'] = None
-                #print(d)
+                    d[h] = None
             if h == 'Time':
                 data = v.getchildren()[0].text
                 if data is not None:
@@ -167,9 +171,8 @@ def getEventTable(root):
                         data = '0:' + data
                 d['Time'] = data
                 
-                # 30/11/19 - Note is now inside the Name cell
+                # 30/11/19 - Note is now inside the Time cell
                 d['Note'] = v.getchildren()[1].getchildren()[0].text
-                #print(d)
         results.append(d)
     if len(results) > 0:
         if 'Pos' not in results[0].keys():
