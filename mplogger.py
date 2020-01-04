@@ -16,19 +16,22 @@ sender_config = {
             'level':       'INFO',
         },
         'checkhistory': {
-            'level':       'DEBUG',
+            'level':       'INFO',
         },
         'worker': {
             'level':       'INFO',
         },
         'parkrunlist': {
-            'level':       'INFO',
+            'level':       'DEBUG',
         },
         'parkruncalendar': {
             'level':       'DEBUG',
         },
         'dbconnection': {
             'level':       'INFO',
+        },
+        'pathfinder': {
+            'level':       'DEBUG',
         },
     },
     'root': {
