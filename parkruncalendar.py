@@ -110,8 +110,10 @@ if __name__ == '__main__':
                 try:
                     c.execute("INSERT INTO ParkrunCalendar (ParkrunID, CalendarID, CalendarDate, Notes) VALUES (dbo.getParkrunID('{}'), dbo.getCalendarID('{}'), '{}', '{}')".format(i[1], l, i[0].strftime('%Y-%m-%d'),i[2]))
                     count += 1
+                    logger.info("Added {} for event {} on date {} : {}".format(i[1],l,i[0].strftime('%Y-%m-%d'),i[2]))
                 except pyodbc.IntegrityError:
                     logger.warning('Error writing calendar record {} for event {} on date {}. Investigate.'.format(l, i[1], i[0].strftime('%Y-%m-%d')))
                     
     logger.info("Database updated. {} records added.".format(count))
+    print("Database updated. {} records added.".format(count))
     listener.stop()
