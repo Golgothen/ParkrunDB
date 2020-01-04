@@ -3,7 +3,7 @@ from mplogger import *
 
 import googlemaps
 
-gmaps = googlemaps.Client(key='AIzaSyBRBJna_y-dZh84eeDNVB9NWm2-CKXuqJE')
+gmaps = googlemaps.Client(key='')
 
 
 c = Connection(sender_config)
