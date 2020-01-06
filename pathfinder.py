@@ -6,8 +6,7 @@ import googlemaps
 import datetime
 
 
-gmaps = googlemaps.Client(key='AIzaSyAWsQDjsyReEypMGbt-54LNwwHmxEzSSys')
-
+gmaps = googlemaps.Client(key='')
 
 c = Connection(sender_config)
 
