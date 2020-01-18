@@ -372,14 +372,14 @@ class Worker(multiprocessing.Process):
         for v in volunteerNames:
             fn = ''
             ln = ''
-            n = v.text.split()
-            fn  = n[0]
+            nameString = v.text
+            n = nameString.split()
+            fn  = n[0].replace("'","''").strip()
             del n[0]
             for l in n:
                 ln += l + ' ' 
-            fn = fn.replace("'","''").strip()
             ln = ln.replace("'","''").strip()
-            volunteers.append({'AthleteID': int(v.get('href').split('=')[1]), 'FirstName': fn, 'LastName' : ln})
+            volunteers.append({'AthleteID': int(v.get('href').split('=')[1]), 'FirstName': fn, 'LastName' : ln, 'NameString':nameString, 'Volunteer':{}})
         
         # Remove athletes that already have volunteered for this event
         vl = c.execute("SELECT Athletes.AthleteID, FirstName, LastName FROM EventVolunteers  INNER JOIN Athletes on Athletes.AthleteID = EventVolunteers.AthleteID WHERE EventID = dbo.getEventID('{}', {})".format(eventURL, eventnumber))
@@ -387,162 +387,177 @@ class Worker(multiprocessing.Process):
             volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
             self.logger.info('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
         
-        # Retrieve all remaining volunteer stats and remove accounted stats.
-        for v in volunteers:
-            v['Volunteer'] = {}
-            table = None
-            if v['AthleteID'] != 0:
-                found = False
-                retry = 0
-                athletepage = None
-                while not found and retry < 3:
-                    athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
-                    if athletepage is not None:
-                        found = True
-                    else:
-                        retry += 1
-                        self.logger.warning("URL Error for athlete {} on attempt {}".format(v['AthleteID'], retry))
-                        self.logger.debug('Sleeping {} seconds...'.format(self.delay))
-                        sleep(self.delay)
-                if athletepage is None:
-                    self.logger.error("Failed to retrieve athlete stats for {} {} ({}), Skipping".format(v['FirstName'], v['LastName'], v['AthleteID']))
-                    continue
-                if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
-                    if len(athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()) > 0:
-                        if athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()[0].text == 'Volunteer Summary':
-                            table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+        #See if the volunteer roster is still available
+        eventRoster = self.getURL('https://www.parkrun.com.au/{}/futureroster/'.format(eventURL))
+        roster = eventRoster.xpath('//*[@id="rosterTable"]')
+        FirstRosterDate = datetime.strptime(roster[0][0][0][1].text,'%d %B %Y')
+        if FirstRosterDate == date:
+            #Roster for today is available
+            for i in range(len(roster[0][1])):
+                #Some positions on the roster are empty.  Ignore these.
+                if roster[0][1][i][1].text is not None:
+                     for v in volunteers:
+                         if v['NameString'] == roster[0][1][i][1].text:
+                             v['Volunteer'][roster[0][1][i][0][0].text] = 1
+                              
+        else:
+            #Roster is not available, do it the old way
+            # Retrieve all remaining volunteer stats and remove accounted stats.
+            for v in volunteers:
+                v['Volunteer'] = {}
+                table = None
+                if v['AthleteID'] != 0:
+                    found = False
+                    retry = 0
+                    athletepage = None
+                    while not found and retry < 3:
+                        athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+                        if athletepage is not None:
+                            found = True
+                        else:
+                            retry += 1
+                            self.logger.warning("URL Error for athlete {} on attempt {}".format(v['AthleteID'], retry))
+                            self.logger.debug('Sleeping {} seconds...'.format(self.delay))
+                            sleep(self.delay)
+                    if athletepage is None:
+                        self.logger.error("Failed to retrieve athlete stats for {} {} ({}), Skipping".format(v['FirstName'], v['LastName'], v['AthleteID']))
+                        continue
+                    if len(athletepage.xpath('//*[@id="results"]/tbody')) > 2:
+                        if len(athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()) > 0:
+                            if athletepage.xpath('//*[@id="content"]/div[3]')[0].getchildren()[0].text == 'Volunteer Summary':
+                                table = athletepage.xpath('//*[@id="results"]/tbody')[2]
+                            else:
+                                self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
                         else:
                             self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
-                    else:
-                        self.logger.warning("Athlete {} {} ({}) has no volunteer history.  Possibly identified incorrect athlete for {} event {}".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
-                if v != volunteers[-1]:
-                    self.logger.debug('Sleeping {} seconds...'.format(self.delay))
-                    sleep(self.delay)
-            if table is not None:
-                for r in table.getchildren():
-                    if int(r.getchildren()[0].text) == date.year:
-                        v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
-                athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
-                if len(athletevol) > 0:
-                    for al in athletevol:
-                        if al['VolunteerPosition'] in v['Volunteer']:
-                            v['Volunteer'][al['VolunteerPosition']] -= al['Count']
-                            if v['Volunteer'][al['VolunteerPosition']] == 0:
-                                del v['Volunteer'][al['VolunteerPosition']]
+                    if v != volunteers[-1]:
+                        self.logger.debug('Sleeping {} seconds...'.format(self.delay))
+                        sleep(self.delay)
+                if table is not None:
+                    for r in table.getchildren():
+                        if int(r.getchildren()[0].text) == date.year:
+                            v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
+                    athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+                    if len(athletevol) > 0:
+                        for al in athletevol:
+                            if al['VolunteerPosition'] in v['Volunteer']:
+                                v['Volunteer'][al['VolunteerPosition']] -= al['Count']
+                                if v['Volunteer'][al['VolunteerPosition']] == 0:
+                                    del v['Volunteer'][al['VolunteerPosition']]
+            
+            if results is not None:
+                #Search results for volunteer athlete ID's that appear in the results
+                req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
+                l = []
+                for r in req:
+                    l.append(r['VolunteerPosition'])
+                
+                for v in volunteers:
+                    try:
+                        a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                        if v['AthleteID'] != 0:
+                            v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
+                    except StopIteration:
+                        pass
         
-        if results is not None:
-            #Search results for volunteer athlete ID's that appear in the results
-            req = c.execute("SELECT * FROM VolunteerPositions WHERE CanRun = 1")
+                #Remove volunteer positions from people who don't appear in the results
+                req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
+                l = []
+                for r in req:
+                    l.append(r['VolunteerPosition'])
+                
+                for v in volunteers:
+                    try:
+                        a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
+                        #self.logger.debug(a)
+                    except StopIteration:
+                        v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
+                
+                # Locate tail walkers correctly from the rear of the field
+                found = True
+                while found:
+                    found = False
+                    for v in volunteers:
+                        try:
+                            a = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
+                            self.logger.debug(a)
+                            if 'Tail Walker' in v['Volunteer']:
+                                v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
+                                results = results[:-1]
+                                self.logger.info('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
+                                found = True
+                        except StopIteration:
+                            if 'Tail Walker' in v['Volunteer'] and len(v['Volunteer']) > 1:
+                                del v['Volunteer']['Tail Walker']
+                                self.logger.debug('Deleting Tail Walker from {} {}'.format(v['FirstName'], v['LastName']))
+            
+            #Search for vital roles
+            req = c.execute("SELECT VolunteerPosition FROM VolunteerPositions WHERE VolunteerPositions.Required = 1 AND VolunteerPositionID NOT IN (SELECT VolunteerPositionID FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}))".format(eventURL, eventnumber))
             l = []
             for r in req:
                 l.append(r['VolunteerPosition'])
             
             for v in volunteers:
-                try:
-                    a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-                    if v['AthleteID'] != 0:
-                        v['Volunteer'] = {k: v['Volunteer'][k] for k in l if k in v['Volunteer']}
-                except StopIteration:
-                    pass
-    
-            #Remove volunteer positions from people who don't appear in the results
-            req = c.execute("SELECT * FROM VolunteerPositions WHERE MustRun = 1")
-            l = []
-            for r in req:
-                l.append(r['VolunteerPosition'])
+                if len(v['Volunteer']) == 1:
+                    try:
+                        l.remove(next(r for r in v['Volunteer'] if r in l))
+                    except StopIteration:
+                        pass
             
-            for v in volunteers:
-                try:
-                    a = next(r for r in results if r['AthleteID'] == v['AthleteID'])
-                    #self.logger.debug(a)
-                except StopIteration:
-                    v['Volunteer'] = {k: v['Volunteer'][k] for k in v['Volunteer'] if k not in l}
-            
-            # Locate tail walkers correctly from the rear of the field
             found = True
             while found:
                 found = False
-                for v in volunteers:
-                    try:
-                        a = next(r for r in results if r['AthleteID'] == v['AthleteID'] and r['Pos'] == len(results))
-                        self.logger.debug(a)
-                        if 'Tail Walker' in v['Volunteer']:
-                            v['Volunteer'] = {'Tail Walker': v['Volunteer']['Tail Walker']}
-                            results = results[:-1]
-                            self.logger.info('Setting {} {} to Tail Walker'.format(v['FirstName'], v['LastName']))
+                for r in l:
+                    for v in volunteers:
+                        if r in v['Volunteer']:
+                            self.logger.info("Setting {} to {} {}".format(r, v['FirstName'], v['LastName']))
+                            v['Volunteer'] = {r: v['Volunteer'][r]}
                             found = True
-                    except StopIteration:
-                        if 'Tail Walker' in v['Volunteer'] and len(v['Volunteer']) > 1:
-                            del v['Volunteer']['Tail Walker']
-                            self.logger.debug('Deleting Tail Walker from {} {}'.format(v['FirstName'], v['LastName']))
-        
-        #Search for vital roles
-        req = c.execute("SELECT VolunteerPosition FROM VolunteerPositions WHERE VolunteerPositions.Required = 1 AND VolunteerPositionID NOT IN (SELECT VolunteerPositionID FROM EventVolunteers WHERE EventID = dbo.getEventID('{}', {}))".format(eventURL, eventnumber))
-        l = []
-        for r in req:
-            l.append(r['VolunteerPosition'])
-        
-        for v in volunteers:
-            if len(v['Volunteer']) == 1:
-                try:
-                    l.remove(next(r for r in v['Volunteer'] if r in l))
-                except StopIteration:
-                    pass
-        
-        found = True
-        while found:
-            found = False
-            for r in l:
-                for v in volunteers:
-                    if r in v['Volunteer']:
-                        self.logger.info("Setting {} to {} {}".format(r, v['FirstName'], v['LastName']))
-                        v['Volunteer'] = {r: v['Volunteer'][r]}
-                        found = True
-                        l.remove(r)
-                        for y in volunteers:
-                            if y['AthleteID'] != v['AthleteID']:
-                                if r in y['Volunteer']:
-                                    del y['Volunteer'][r]
+                            l.remove(r)
+                            for y in volunteers:
+                                if y['AthleteID'] != v['AthleteID']:
+                                    if r in y['Volunteer']:
+                                        del y['Volunteer'][r]
+                            break
+            
+            while len(l) > 0:
+                for x in l:
+                    found = False
+                    for v in volunteers:
+                        if len(v['Volunteer']) == 0:# and v['AthleteID'] != 0:
+                            v['Volunteer'] = {x : 1}
+                            self.logger.info("Position {} at {} event {} has been filled by Unknown Athlete {} {}.".format(x, eventURL, eventnumber, v['FirstName'], v['LastName']))
+                            found = True
+                            l.remove(x)
+                            break
+                    if found:
                         break
-        
-        while len(l) > 0:
-            for x in l:
-                found = False
-                for v in volunteers:
-                    if len(v['Volunteer']) == 0:# and v['AthleteID'] != 0:
-                        v['Volunteer'] = {x : 1}
-                        self.logger.info("Position {} at {} event {} has been filled by Unknown Athlete {} {}.".format(x, eventURL, eventnumber, v['FirstName'], v['LastName']))
-                        found = True
+                    else:
+                        self.logger.warning("Position {} at {} event {} has not been filled. Investigate".format(x, eventURL, eventnumber))
                         l.remove(x)
-                        break
-                if found:
-                    break
-                else:
-                    self.logger.warning("Position {} at {} event {} has not been filled. Investigate".format(x, eventURL, eventnumber))
-                    l.remove(x)
-                    break                
-                        
-        #Search for duplicate positions that are not allowed
-        req = c.execute("SELECT * FROM VolunteerPositions WHERE AllowMultiple = 0")
-        l = []
-        for r in req:
-            l.append(r['VolunteerPosition'])
-        
-        for v in volunteers:
-            if any(name in v['Volunteer'] for name in l):
-                try:
-                    p = next(r for r in v['Volunteer'] if r in l and len(v['Volunteer']) > 1)
-                    self.logger.debug('Deleting {} from {} {}'.format(p, v['FirstName'], v['LastName']))
-                    del v['Volunteer'][p]
-                except StopIteration:
-                    pass
-        
-        # Delete volunteers with empty volunteer lists
-        for v in volunteers:
-            if len(v['Volunteer']) == 0:
-                self.logger.warning("Athlete {} {} ({}) did not get a volunteer position for {} event {}. Investigate".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
-                v['Volunteer']['Unknown'] = 1
-        
+                        break                
+                            
+            #Search for duplicate positions that are not allowed
+            req = c.execute("SELECT * FROM VolunteerPositions WHERE AllowMultiple = 0")
+            l = []
+            for r in req:
+                l.append(r['VolunteerPosition'])
+            
+            for v in volunteers:
+                if any(name in v['Volunteer'] for name in l):
+                    try:
+                        p = next(r for r in v['Volunteer'] if r in l and len(v['Volunteer']) > 1)
+                        self.logger.debug('Deleting {} from {} {}'.format(p, v['FirstName'], v['LastName']))
+                        del v['Volunteer'][p]
+                    except StopIteration:
+                        pass
+            
+            # Delete volunteers with empty volunteer lists
+            for v in volunteers:
+                if len(v['Volunteer']) == 0:
+                    self.logger.warning("Athlete {} {} ({}) did not get a volunteer position for {} event {}. Investigate".format(v['FirstName'], v['LastName'], v['AthleteID'], eventURL, eventnumber))
+                    v['Volunteer']['Unknown'] = 1
+            
         # Any athlete with more than one possible volunteer role: just pick the first one
         for v in volunteers:
             if len(v['Volunteer']) > 1:
