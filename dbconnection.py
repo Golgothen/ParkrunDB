@@ -97,7 +97,7 @@ class Connection():
                 ageCat = ''
                 ageGroup = 'WC'
             else:
-                startage = int(ageGroup.split('-')[0])
+                startage = int(ageGroup.replace('+','').split('-')[0])
                 if startage in [10, 11, 15]:
                     ageCat = 'J'
                 if startage in [18, 20, 25, 30]:
