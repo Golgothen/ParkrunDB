@@ -393,6 +393,7 @@ class Worker(multiprocessing.Process):
         FirstRosterDate = datetime.strptime(roster[0][0][0][1].text,'%d %B %Y')
         if FirstRosterDate == date:
             #Roster for today is available
+            self.logger.info('Downloading event roster')
             for i in range(len(roster[0][1])):
                 #Some positions on the roster are empty.  Ignore these.
                 if roster[0][1][i][1].text is not None:
