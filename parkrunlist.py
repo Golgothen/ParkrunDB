@@ -64,9 +64,9 @@ class ParkrunList():
                 sql += 'datepart(year,LaunchDate) <= {}'.format(self.year)
         if self.mode == Mode.NEWEVENTS:
             if not self.inactive or self.year != 0:
-                sql += ' AND (LastUpdated < dateadd(day, -3, getdate()) or LastUpdated IS NULL)'
+                sql += ' AND (LastUpdated < dateadd(day, -dbo.getReportDelay(), getdate()) or LastUpdated IS NULL)'
             else:
-                sql += ' WHERE (LastUpdated < dateadd(day, -3, getdate()) or LastUpdated IS NULL)'
+                sql += ' WHERE (LastUpdated < dateadd(day, -dbo.getReportDelay(), getdate()) or LastUpdated IS NULL)'
                 
         data = c.execute(sql)
         for row in data:
