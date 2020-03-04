@@ -18,7 +18,7 @@ intervals = (
     ('seconds', 1),
     )
 
-def display_time(seconds, granularity=4):
+def display_time(seconds, granularity=2):
     result = []
 
     for name, count in intervals:
@@ -83,7 +83,7 @@ def getEventTable(root):
     
     # 30/10/19 - Tables now only have 6 cells.  Untested on international sites
     #if len(rows) > 0:
-    #    if len(rows[0].getchildren()) < 11:  # France results have no position or Gender position columns
+    #    if len(rows[0]) < 11:  # France results have no position or Gender position columns
     #        headings = ['parkrunner','Time','Age Cat','Age Grade','Gender','Club','Note']#,'Strava']
     #else:
     #    headings = ['Pos','parkrunner','Time','Age Cat','Age Grade','Gender','Gender Pos','Club','Note'] #,'Strava']
@@ -91,7 +91,7 @@ def getEventTable(root):
     
     for row in rows:
         d = {}
-        for h, v in zip(headings, row.getchildren()):
+        for h, v in zip(headings, row):
             # 30/10/19 - Remained unchanged
             if h == 'Pos':
                 d['Pos'] = int(v.text)
@@ -104,8 +104,8 @@ def getEventTable(root):
             #        d[h]=None
             
             if h == 'parkrunner':
-                if len(v.getchildren()[0].getchildren())>0:
-                    data = v.getchildren()[0].getchildren()[0].text
+                if len(v[0])>0:
+                    data = v[0][0].text
                     if len(data.split()) == 0:
                         # Unnamed athlete
                         d['FirstName'] = 'Unknown'
@@ -127,7 +127,7 @@ def getEventTable(root):
                         d['LastName'] = lastName.strip()
                     else:
                         d['LastName'] = ''
-                    d['AthleteID'] = int(v.getchildren()[0].getchildren()[0].get('href').split('=')[1])
+                    d['AthleteID'] = int(v[0][0].get('href').split('=')[1])
                 else:
                     # Unknown Athlete
                     d['FirstName'] = 'Unknown'
@@ -141,38 +141,38 @@ def getEventTable(root):
                     break
             if h == 'Gender':
                 #30/10/19 - Gender also holds Gender Pos.
-                if v.getchildren()[0].text.strip() is not None:
-                    d['Gender'] = v.getchildren()[0].text.strip()[0]
+                if len(v[0].text.strip()) > 0:
+                    d['Gender'] = v[0].text.strip()[0]
                 else:
                     d['Gender'] = 'M'
             if h == 'Age Cat':
-                if len(v.getchildren())>0:
+                if len(v)>0:
                     # 30/10/19 - Age Category and Age Grade are now in the same cell
-                    d['Age Cat'] = v.getchildren()[0].getchildren()[0].text
-                    if len(v.getchildren()) > 1:
-                        d['Age Grade'] = float(v.getchildren()[1].text.split('%')[0])
+                    d['Age Cat'] = v[0][0].text
+                    if len(v) > 1:
+                        d['Age Grade'] = float(v[1].text.split('%')[0])
                     else:
                         d['Age Grade'] = None
                 else:
                     d['Age Cat'] = None
                     d['Age Grade'] = None
             if h == 'Club':
-                if len(v.getchildren())>0:
-                    if v.getchildren()[0].getchildren()[0].text is not None:
-                        d[h] = v.getchildren()[0].getchildren()[0].text.replace("'","''")
+                if len(v)>0:
+                    if v[0][0].text is not None:
+                        d[h] = v[0][0].text.replace("'","''")
                     else:
                         d[h] = None
                 else:
                     d[h] = None
             if h == 'Time':
-                data = v.getchildren()[0].text
+                data = v[0].text
                 if data is not None:
                     if len(data)<6:
                         data = '0:' + data
                 d['Time'] = data
                 
                 # 30/11/19 - Note is now inside the Time cell
-                d['Note'] = v.getchildren()[1].getchildren()[0].text
+                d['Note'] = v[1][0].text
         results.append(d)
     if len(results) > 0:
         if 'Pos' not in results[0].keys():
