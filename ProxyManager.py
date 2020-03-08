@@ -11,23 +11,35 @@ class Crawler():
     Subclasses of this class will have the specific code needed for interpreting each web page table
     """
     
-    def __init__(self, name, proxyQue):
+    def __init__(self, name, proxyQue, newProxies):
         self.name = name
+        self.untestedProxies = newProxies
         self.proxyQue = proxyQue
+        self.thread_count = 5
     
     def getProxies(self):
         # Subclasses will provide this code and put their results into the self.proxyQue
         print('Crawler {} scanning for proxies'.format(self.name))
     
-    def testProxy(self, proxy):
-        print("Testing: {}".format(proxy))
-        try:
-            response = requests.get('https://httpbin.org/ip', proxies={"http": proxy, "https": proxy}, timeout = 5)
-            print('Valid')
-            return True
-        except:
-            print('Invalid')
-            return False
+    def testProxies(self):
+        t = []
+        for i in range(self.thread_count):
+            self.untestedProxies.put(None)
+            t.append(threading.Thread(target = self.__testProxy)) 
+            t[i].start()
+    
+    def __testProxy(self): 
+        while True:
+            proxy = self.untestedProxies.get()
+            if proxy == None:
+                break
+            print('Testing {}'.format(proxy))
+            try:
+                response = requests.get('https://httpbin.org/ip', proxies={"http": proxy, "https": proxy}, timeout = 5)
+                self.proxyQue.put(proxy)
+            except:
+                pass
+                
     
     def getURL(self, url):
         completed = False
@@ -62,8 +74,8 @@ class FreeProxyList(Crawler):
     FreeProxyList scrapes proxy information from https://free-proxy-list.net
     """
     
-    def __init__(self, proxyQue):
-        super().__init__('Free_Proxy_List', proxyQue)
+    def __init__(self, proxyQue, untestedProxies):
+        super().__init__('Free_Proxy_List', proxyQue, untestedProxies)
     
     def getProxies(self):
         super().getProxies()
@@ -77,19 +89,17 @@ class FreeProxyList(Crawler):
             https = containers.find_all("td")[i+6].text
             #print("ip address : {:<15}   port : {:<5}   https : {:<3} ".format(ip, port, https))
             if https == 'yes':
-                if self.testProxy(ip + ':' + port):
-                    self.proxyQue.put(ip + ':' + port)
-        print('Crawler {} complete'.format(self.name))
-        
-
+                self.untestedProxies.put(ip + ':' + port)
+        print('Crawler {} complete. Testing.'.format(self.name))
+        self.testProxies()
 
 class SpyOne(Crawler):
     
     """
     SpyOne scrapes proxies from http://spys.one/en/https-ssl-proxy/
     """
-    def __init__(self, proxyQue):
-        super().__init__('SpyOne', proxyQue)
+    def __init__(self, proxyQue, untestedProxies):
+        super().__init__('SpyOne', proxyQue, untestedProxies)
     
     def getProxies(self):
         super().getProxies()
@@ -100,30 +110,33 @@ class SpyOne(Crawler):
         for i in range(2,len(t)-1):
             ip = t[i][0][0].text
             port = '8080'
-            if self.testProxy(ip + ':' + port):
-                self.proxyQue.put(ip + ':' + port)
+            self.untestedProxies.put(ip + ':' + port)
         
         print('Crawler {} complete'.format(self.name))
-    
+
+
+
 class ProxyScrape(Crawler):
     
     """
     ProxyScrape scrapes proxies from https://api.proxyscrape.com
     """
     
-    def __init__(self, proxyQue):
-        super().__init__('ProxyScrape', proxyQue)
+    def __init__(self, proxyQue, untestedProxies):
+        super().__init__('ProxyScrape', proxyQue, untestedProxies)
     
     def getProxies(self):
         super().getProxies()
         lx = self.getURL('https://api.proxyscrape.com/?request=getproxies&proxytype=http&timeout=10000&country=all&ssl=all&anonymity=all')
         l = lx.text.split('\r\n')
+        max = len(l)
+        #if max > 100:
+        #    l = l[:100]
         for i in l:
-            if self.testProxy(i):
-                self.proxyQue.put(i)
+            self.untestedProxies.put(i)
         print('Crawler {} complete'.format(self.name))
     
-
+"""
 class NonDupeQueue(multiprocessing.queues.Queue):
     
     def __init__(self, *args, **kwargs): 
@@ -140,6 +153,7 @@ class NonDupeQueue(multiprocessing.queues.Queue):
         x = super().get(*args, **kwargs)
         self.__items = [i for i in self.__items if i != x]
         return x
+"""
 
            
 class ProxyManager(multiprocessing.Process):
@@ -154,7 +168,8 @@ class ProxyManager(multiprocessing.Process):
         super(ProxyManager, self).__init__()
         self.__crawlers = []
         self.__crawler_threads = []
-        self.__proxies = None
+        self.__proxies = multiprocessing.Queue()
+        self.__untested_proxies = multiprocessing.Queue()
         self.__min_proxy_count = 3
         self.__exitEvent = exitEvent
         self.__proxyList = []
@@ -198,9 +213,9 @@ class ProxyManager(multiprocessing.Process):
         return x
     
     def run(self):
-        self.__proxies = NonDupeQueue()
-        self.addCrawler(FreeProxyList(self.__proxies))
-        self.addCrawler(ProxyScrape(self.__proxies))
+        #self.__proxies = NonDupeQueue()
+        self.addCrawler(FreeProxyList(self.__proxies, self.__untested_proxies))
+        #self.addCrawler(ProxyScrape(self.__proxies))
         for i in self.__crawlers:
             x = threading.Thread(target = i.getProxies, daemon = True, name = i.name)
             self.__crawler_threads.append(x)
