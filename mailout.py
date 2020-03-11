@@ -4,22 +4,15 @@ from lxml import etree as e
 from mplogger import *
 from dbconnection import Connection
 
-loggingQueue = multiprocessing.Queue()
-
-#listener = LogListener(loggingQueue)
-#listener.start()
-
-config = sender_config
-config['handlers']['queue']['queue'] = loggingQueue
-#logging.config.dictConfig(config)
-#logger = logging.getLogger('checkhistory')
-
-c = Connection(config)
-
 fstr = lambda s: '' if s is None else str(s)
 
+loggingQueue = multiprocessing.Queue()
+config = sender_config
+config['handlers']['queue']['queue'] = loggingQueue
 
 def buildDetailParkrunReport(parkrun):
+    c = Connection(config)
+    
     data = c.execute(f"select * from getParkrunReportDetail('{parkrun}') order by [Total Runs] desc")
     
     root = e.Element('html', version = '5.0')
@@ -132,6 +125,7 @@ def buildDetailParkrunReport(parkrun):
     return root #lxml.html.tostring()
 
 def buildSummaryParkrunReport(parkrun):
+    c = Connection(config)
     data = c.execute(f"select * from getParkrunReportSummary('{parkrun}') order by [Total Runs] desc")
     
     root = e.Element('html', version = '5.0')
@@ -185,6 +179,7 @@ def buildSummaryParkrunReport(parkrun):
                     background-color: Azure
                 }
                 table{
+                    align : center;
                     border-spacing : 0;
                     padding : 20px;
                     cellspacing : 4;
@@ -235,6 +230,27 @@ def buildSummaryParkrunReport(parkrun):
             """
     return root #lxml.html.tostring()
 
+def parkrunMilestoneMailout():
+    
+    listener = LogListener(loggingQueue)
+    listener.start()
+    
+    logging.config.dictConfig(config)
+    logger = logging.getLogger('mailout')
+    
+    c = Connection(config)
 
-lxml.html.open_in_browser(buildDetailParkrunReport('Shellharbour'))
-
+    service = gMail.auth()
+    
+    maillist = c.execute('SELECT Email, ParkrunName, Detailed from Parkruns WHERE Subscribed = 1')
+    for m in maillist:
+        if m['Detailed']:
+            text = lxml.html.tostring(buildDetailParkrunReport(m['ParkrunName'])).decode('utf-8')
+        else:
+            text = lxml.html.tostring(buildSummaryParkrunReport(m['ParkrunName'])).decode('utf-8')
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], 'Weekly Upcoming Milestone Report', text))
+        
+        logger.info(f"{r} sent to {m['Email']} for parkrun {m['ParkrunName']}")
+    
+    listener.stop()
+    

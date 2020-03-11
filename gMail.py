@@ -108,20 +108,3 @@ def CreateMessageWithAttachment(sender, to, subject, message_text, file_dir, fil
     message.attach(msg)
     #return {'raw': message.as_string()}
     return {'raw': base64.urlsafe_b64encode(message.as_bytes()).decode()}
-
-if __name__ == '__main__':
-service = auth()
-
-#import html from a pre-generated file
-text = open('report.html','r').read()
-
-text = fromstring(text)
-text = tostring(text).decode('utf-8')
-
-msg = CreateMessage('golgothen@gmail.com','golgothen@gmail.com','This weeks Victorian parkrun report',text)
-msg = CreateMessageWithAttachment('golgothen@gmail.com','golgothen@gmail.com','This weeks Victorian parkrun report',text,'e:/Dropbox/Pauls Docs/Statesman Reports/','Victorian Statesmans 20200229.pdf')
-SendMessage(service,'me',msg)
-
-    
-        
-    
