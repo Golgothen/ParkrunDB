@@ -46,6 +46,9 @@ StyleSheet = """
                 .centered {
                     text-align : center;
                 }
+                .arrow {
+                    font-family : wingdings;
+                }
                 tr, td {
                     font-size : 14px;
                     vertical-align : middle;
@@ -64,6 +67,32 @@ StyleSheet = """
                 h3 {
                     padding : 20px;
                 }
+                i {
+                  border: solid black;
+                  border-width: 0 3px 3px 0;
+                  display: inline-block;
+                  padding: 3px;
+                }
+                
+                .right {
+                  transform: rotate(-45deg);
+                  -webkit-transform: rotate(-45deg);
+                }
+                
+                .left {
+                  transform: rotate(135deg);
+                  -webkit-transform: rotate(135deg);
+                }
+                
+                .up {
+                  transform: rotate(-135deg);
+                  -webkit-transform: rotate(-135deg);
+                }
+                
+                .down {
+                  transform: rotate(45deg);
+                  -webkit-transform: rotate(45deg);
+                }                
             """
 
 
@@ -167,40 +196,46 @@ def buildWeeklyParkrunReport(node):
 
     
     c = Connection(config)
-    data = c.execute(f"SELECT * FROM getStatesmanReport(100, 'Victoria') ORDER BY Rank, TQTY DESC")
+    data = c.execute(f"SELECT * FROM getStatesmanReport(1000, 'Victoria') ORDER BY Rank, TQTY DESC")
     
     colgroups = {
         'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
-        'Athlete'               : ['FirstName', 'LastName'],
         'Weeks<br>Held'         : ['Weeks'],
-        'Events'                : ['Events', 'DifferentEvents'],
-        'Runs'                  : ['EventCount'],
+        'Athlete'               : ['FirstName', 'LastName'],
+        'Events<br>Local/Total' : ['Events', 'DifferentEvents'],
+        'Total<br>Runs'         : ['EventCount'],
         'Tourist<br>Quotient'   : ['TQ', 'TQTY'],
-        'This Year<br>Run  New' : ['TYEventsDone', 'TYNewEvents'],
-        'Last Year<br>Run  New' : ['LYEventsDone', 'LYNewEvents'],
+        'This Year<br>Run/New'  : ['TYEventsDone', 'TYNewEvents'],
+        'Last Year<br>Run/New'  : ['LYEventsDone', 'LYNewEvents'],
         'P<br>Index'            : ['pIndex'],
-        'Wilson<br>Index'       : ['wIndex']
+        'Wilson<br>Index'       : ['wIndex', 'WIndexArrow', 'wIndexChange']
         }
-root = e.Element('html', version = '5.0')
-body = e.SubElement(root, 'body')
-node = body
-t = e.SubElement(node,'table')
-t.attrib['class'] = 'sortable'
-thead = e.SubElement(t,'thead')
-tr = e.SubElement(thead,'tr')
-for i in colgroups:
-    td = e.SubElement(tr,'th')
-    td.text = str(i)
-    td.attrib['class'] = 'header'
-    td.attrib['colspan'] = str(len(colgroups[i]))
+    root = e.Element('html', version = '5.0')
+    body = e.SubElement(root, 'body')
+    node = body
+    t = e.SubElement(node,'table')
+    thead = e.SubElement(t,'thead')
+    tr1 = e.SubElement(thead,'tr')
+    tr2 = e.SubElement(thead,'tr')
+    for i in colgroups:
+        h = str(i).split('<br>')
+        td = e.SubElement(tr1,'th')
+        td.text = h[0]
+        td.attrib['colspan'] = str(len(colgroups[i]))
+        
+        if len(h) > 1:
+            if len(colgroups[i]) > len(h[1].split('/')):
+                td = e.SubElement(tr2,'th')
+                td.attrib['colspan'] = str(len(colgroups[i]))
+                td.text = str(h[1])
+            else:
+                for x in h[1].split('/'):
+                    td = e.SubElement(tr2,'th')
+                    td.text = str(x)
+        else:
+            td = e.SubElement(tr2,'th')
+            td.attrib['colspan'] = str(len(colgroups[i]))
     
-tr = e.SubElement(thead,'tr')
-for i in colgroups:
-    for j in colgroups[i]:
-        td = e.SubElement(tr,'th')
-        td.text = str(j)
-
-lxml.html.open_in_browser(root)    
     rowcount = 0
     for row in data:
         if rowcount == 0:
@@ -213,24 +248,43 @@ lxml.html.open_in_browser(root)
             rowcount = 0
         else:
             cls = ''
-        for k, v in row.items():
-            cls = ''
-            td = e.SubElement(tr, 'td')
-            if type(v).__name__ == 'int':
-                cls = 'number'
-            else:
-                cls='text'
-            if k in ['Gender', 'Age Group']:
-                cls = 'centered'
-            if len(fstr(v)) > 0:
-                td.text = fstr(v)
-            if k == 'Barcode':
-                cls = 'firstcol text' 
-            if row == data[-1]:
-                cls += ' lastrow'
-            if len(cls) > 0:
-                td.attrib['class'] = cls
-    
+        for i in colgroups:
+            for j in colgroups[i]:
+                td = e.SubElement(tr, 'td')
+                cls = ''
+                if type(row[j]).__name__ == 'int':
+                    cls = 'number'
+                else:
+                    cls='text'
+                #if j in ['Gender', 'Age Group']:
+                #    cls = 'centered'
+                if j == 'Rank':
+                    cls = 'firstcol number' 
+                if row == data[-1]:
+                    cls += ' lastrow'
+                if 'Arrow' in j:
+                    icls = 'arrow'
+                    if j == 'RankArrow':
+                        switch = row['AbsRankChange']
+                    else:
+                        switch = row['wIndexChange']
+                    if switch < 0:
+                        icls += ' down'
+                    if switch == 0:
+                        icls += ' right'
+                    if switch > 0:
+                        icls += ' up'
+                    row[j] = e.SubElement(td, 'i')
+                    row[j].attrib['class'] = icls
+                if len(cls) > 0:
+                    td.attrib['class'] = cls
+                if type(row[j]).__name__ in ['int', 'float', 'str']:
+                    td.text = fstr(row[j])
+                
+
+s = e.SubElement(body,'style')
+s.text = StyleSheet
+lxml.html.open_in_browser(root)    
 
 def parkrunMilestoneMailout():
     
