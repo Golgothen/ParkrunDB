@@ -10,17 +10,68 @@ loggingQueue = multiprocessing.Queue()
 config = sender_config
 config['handlers']['queue']['queue'] = loggingQueue
 
-def buildDetailParkrunReport(parkrun):
+StyleSheet = """ 
+                body {
+                    font-family: 'Montserrat', sans-serif;
+                    background-color: Azure
+                }
+                table{
+                    border-spacing : 0;
+                    padding : 20px;
+                    cellspacing : 4;
+                    cellpadding : 0;
+                    border : 1px solid black;
+                }
+                .milestone {
+                    background-color: Yellow
+                }
+                .altrow1 {
+                    background-color: SpringGreen
+                }
+                .altrow2 {
+                    background-color: LightGreen
+                }
+                .lastrow {
+                    border-bottom : 1px solid black;
+                }
+                .firstcol {
+                    border-left : 1px solid black;
+                }
+                .text {
+                    text-align : left;
+                }
+                .number {
+                    text-align : right;
+                }
+                .centered {
+                    text-align : center;
+                }
+                tr, td {
+                    font-size : 14px;
+                    vertical-align : middle;
+                    padding : 5px;
+                    border-top: 1px solid black;
+                    border-right: 1px solid black;
+                    border-bottom : 0;
+                    border-left : 0;
+                }
+                th {
+                    font-size : 16px';
+                    font-weight : normal;
+                    text-align : center;
+                    padding : 4px;
+                }
+                h3 {
+                    padding : 20px;
+                }
+            """
+
+
+def buildDetailParkrunReport(parkrun, node):
     c = Connection(config)
     
     data = c.execute(f"select * from getParkrunReportDetail('{parkrun}') order by [Total Runs] desc")
-    
-    root = e.Element('html', version = '5.0')
-    
-    body = e.SubElement(root, 'body')
-    h = e.SubElement(body,'h3')
-    h.text = f'Upcomming milestones for {parkrun} parkrun'
-    t = e.SubElement(body,'table')
+    t = e.SubElement(node,'table')
     t.attrib['class'] = 'sortable'
     thead = e.SubElement(t,'thead')
     tr = e.SubElement(thead,'tr')
@@ -66,74 +117,13 @@ def buildDetailParkrunReport(parkrun):
                 cls += ' lastrow'
             if len(cls) > 0:
                 td.attrib['class'] = cls
-    
-    s = e.SubElement(body,'style')
-    s.text = """ 
-                body {
-                    font-family: 'Montserrat', sans-serif;
-                    background-color: Azure
-                }
-                table{
-                    border-spacing : 0;
-                    padding : 20px;
-                    cellspacing : 4;
-                    cellpadding : 0;
-                }
-                .milestone {
-                    background-color: Yellow
-                }
-                .altrow1 {
-                    background-color: SpringGreen
-                }
-                .altrow2 {
-                    background-color: LightGreen
-                }
-                .lastrow {
-                    border-bottom : 1px solid black;
-                }
-                .firstcol {
-                    border-left : 1px solid black;
-                }
-                .text {
-                    text-align : left;
-                }
-                .number {
-                    text-align : right;
-                }
-                .centered {
-                    text-align : center;
-                }
-                tr, td {
-                    font-size : 14px;
-                    vertical-align : middle;
-                    padding : 5px;
-                    border-top: 1px solid black;
-                    border-right: 1px solid black;
-                    border-bottom : 0;
-                    border-left : 0;
-                }
-                th {
-                    font-size : 16px';
-                    font-weight : normal;
-                    text-align : center;
-                    padding : 4px;
-                }
-                h3 {
-                    padding : 20px;
-                }
-            """
-    return root #lxml.html.tostring()
+    #return #root #lxml.html.tostring()
 
-def buildSummaryParkrunReport(parkrun):
+def buildSummaryParkrunReport(parkrun, node):
     c = Connection(config)
     data = c.execute(f"select * from getParkrunReportSummary('{parkrun}') order by [Total Runs] desc")
     
-    root = e.Element('html', version = '5.0')
-    
-    body = e.SubElement(root, 'body')
-    h = e.SubElement(body,'h3')
-    h.text = f'Upcomming milestones for {parkrun} parkrun'
-    t = e.SubElement(body,'table')
+    t = e.SubElement(node,'table')
     t.attrib['class'] = 'sortable'
     thead = e.SubElement(t,'thead')
     tr = e.SubElement(thead,'tr')
@@ -171,64 +161,76 @@ def buildSummaryParkrunReport(parkrun):
                 cls += ' lastrow'
             if len(cls) > 0:
                 td.attrib['class'] = cls
+    #return root #lxml.html.tostring()
+
+def buildWeeklyParkrunReport(node):
+
     
-    s = e.SubElement(body,'style')
-    s.text = """ 
-                body {
-                    font-family: 'Montserrat', sans-serif;
-                    background-color: Azure
-                }
-                table{
-                    align : center;
-                    border-spacing : 0;
-                    padding : 20px;
-                    cellspacing : 4;
-                    cellpadding : 0;
-                }
-                .milestone {
-                    background-color: Yellow
-                }
-                .altrow1 {
-                    background-color: SpringGreen
-                }
-                .altrow2 {
-                    background-color: LightGreen
-                }
-                .lastrow {
-                    border-bottom : 1px solid black;
-                }
-                .firstcol {
-                    border-left : 1px solid black;
-                }
-                .text {
-                    text-align : left;
-                }
-                .number {
-                    text-align : right;
-                }
-                .centered {
-                    text-align : center;
-                }
-                tr, td {
-                    font-size : 14px;
-                    vertical-align : middle;
-                    padding : 5px;
-                    border-top: 1px solid black;
-                    border-right: 1px solid black;
-                    border-bottom : 0;
-                    border-left : 0;
-                }
-                th {
-                    font-size : 16px';
-                    font-weight : normal;
-                    text-align : center;
-                    padding : 4px;
-                }
-                h3 {
-                    padding : 20px;
-                }
-            """
-    return root #lxml.html.tostring()
+    c = Connection(config)
+    data = c.execute(f"SELECT * FROM getStatesmanReport(100, 'Victoria') ORDER BY Rank, TQTY DESC")
+    
+    colgroups = {
+        'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
+        'Athlete'               : ['FirstName', 'LastName'],
+        'Weeks<br>Held'         : ['Weeks'],
+        'Events'                : ['Events', 'DifferentEvents'],
+        'Runs'                  : ['EventCount'],
+        'Tourist<br>Quotient'   : ['TQ', 'TQTY'],
+        'This Year<br>Run  New' : ['TYEventsDone', 'TYNewEvents'],
+        'Last Year<br>Run  New' : ['LYEventsDone', 'LYNewEvents'],
+        'P<br>Index'            : ['pIndex'],
+        'Wilson<br>Index'       : ['wIndex']
+        }
+root = e.Element('html', version = '5.0')
+body = e.SubElement(root, 'body')
+node = body
+t = e.SubElement(node,'table')
+t.attrib['class'] = 'sortable'
+thead = e.SubElement(t,'thead')
+tr = e.SubElement(thead,'tr')
+for i in colgroups:
+    td = e.SubElement(tr,'th')
+    td.text = str(i)
+    td.attrib['class'] = 'header'
+    td.attrib['colspan'] = str(len(colgroups[i]))
+    
+tr = e.SubElement(thead,'tr')
+for i in colgroups:
+    for j in colgroups[i]:
+        td = e.SubElement(tr,'th')
+        td.text = str(j)
+
+lxml.html.open_in_browser(root)    
+    rowcount = 0
+    for row in data:
+        if rowcount == 0:
+            cls = 'altrow1'
+        else:
+            cls = 'altrow2'
+        tr = e.SubElement(t, 'tr', CLASS=cls)
+        rowcount += 1
+        if rowcount> 1:
+            rowcount = 0
+        else:
+            cls = ''
+        for k, v in row.items():
+            cls = ''
+            td = e.SubElement(tr, 'td')
+            if type(v).__name__ == 'int':
+                cls = 'number'
+            else:
+                cls='text'
+            if k in ['Gender', 'Age Group']:
+                cls = 'centered'
+            if len(fstr(v)) > 0:
+                td.text = fstr(v)
+            if k == 'Barcode':
+                cls = 'firstcol text' 
+            if row == data[-1]:
+                cls += ' lastrow'
+            if len(cls) > 0:
+                td.attrib['class'] = cls
+    
 
 def parkrunMilestoneMailout():
     
@@ -242,15 +244,24 @@ def parkrunMilestoneMailout():
 
     service = gMail.auth()
     
+    
+    
     maillist = c.execute('SELECT Email, ParkrunName, Detailed from Parkruns WHERE Subscribed = 1')
     for m in maillist:
-        if m['Detailed']:
-            text = lxml.html.tostring(buildDetailParkrunReport(m['ParkrunName'])).decode('utf-8')
-        else:
-            text = lxml.html.tostring(buildSummaryParkrunReport(m['ParkrunName'])).decode('utf-8')
-        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], 'Weekly Upcoming Milestone Report', text))
+        root = e.Element('html', version = '5.0')
+        body = e.SubElement(root, 'body')
+        h = e.SubElement(body,'h3')
+        h.text = f"Upcomming milestones for {m['ParkrunName']} parkrun"
         
-        logger.info(f"{r} sent to {m['Email']} for parkrun {m['ParkrunName']}")
+        if m['Detailed']:
+            buildDetailParkrunReport(m['ParkrunName'], body)
+        else:
+            buildSummaryParkrunReport(m['ParkrunName'], body)
+        s = e.SubElement(body,'style')
+        s.text = StyleSheet
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        
+        logger.info(f"{r['id']} sent to {m['Email']} for parkrun {m['ParkrunName']}")
     
     listener.stop()
     
