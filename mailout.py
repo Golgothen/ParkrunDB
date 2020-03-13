@@ -195,91 +195,91 @@ def buildSummaryParkrunReport(parkrun, node):
 def buildWeeklyParkrunReport(node):
 
     
-    c = Connection(config)
-    data = c.execute(f"SELECT * FROM getStatesmanReport(1000, 'Victoria') ORDER BY Rank, TQTY DESC")
+c = Connection(config)
+data = c.execute(f"SELECT * FROM getStatesmanReport(100, 'Victoria') ORDER BY Rank, TQTY DESC")
+
+colgroups = {
+    'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
+    'Weeks<br>Held'         : ['Weeks'],
+    'Athlete'               : ['FirstName', 'LastName'],
+    'Events<br>Local/Total' : ['Events', 'DifferentEvents'],
+    'Total<br>Runs'         : ['EventCount'],
+    'Tourist<br>Quotient'   : ['TQ', 'TQTY'],
+    'This Year<br>Run/New'  : ['TYEventsDone', 'TYNewEvents'],
+    'Last Year<br>Run/New'  : ['LYEventsDone', 'LYNewEvents'],
+    'P<br>Index'            : ['pIndex'],
+    'Wilson<br>Index'       : ['wIndex', 'WIndexArrow', 'wIndexChange']
+    }
+root = e.Element('html', version = '5.0')
+body = e.SubElement(root, 'body')
+node = body
+t = e.SubElement(node,'table')
+thead = e.SubElement(t,'thead')
+tr1 = e.SubElement(thead,'tr')
+tr2 = e.SubElement(thead,'tr')
+for i in colgroups:
+    h = str(i).split('<br>')
+    td = e.SubElement(tr1,'th')
+    td.text = h[0]
+    td.attrib['colspan'] = str(len(colgroups[i]))
     
-    colgroups = {
-        'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
-        'Weeks<br>Held'         : ['Weeks'],
-        'Athlete'               : ['FirstName', 'LastName'],
-        'Events<br>Local/Total' : ['Events', 'DifferentEvents'],
-        'Total<br>Runs'         : ['EventCount'],
-        'Tourist<br>Quotient'   : ['TQ', 'TQTY'],
-        'This Year<br>Run/New'  : ['TYEventsDone', 'TYNewEvents'],
-        'Last Year<br>Run/New'  : ['LYEventsDone', 'LYNewEvents'],
-        'P<br>Index'            : ['pIndex'],
-        'Wilson<br>Index'       : ['wIndex', 'WIndexArrow', 'wIndexChange']
-        }
-    root = e.Element('html', version = '5.0')
-    body = e.SubElement(root, 'body')
-    node = body
-    t = e.SubElement(node,'table')
-    thead = e.SubElement(t,'thead')
-    tr1 = e.SubElement(thead,'tr')
-    tr2 = e.SubElement(thead,'tr')
-    for i in colgroups:
-        h = str(i).split('<br>')
-        td = e.SubElement(tr1,'th')
-        td.text = h[0]
-        td.attrib['colspan'] = str(len(colgroups[i]))
-        
-        if len(h) > 1:
-            if len(colgroups[i]) > len(h[1].split('/')):
-                td = e.SubElement(tr2,'th')
-                td.attrib['colspan'] = str(len(colgroups[i]))
-                td.text = str(h[1])
-            else:
-                for x in h[1].split('/'):
-                    td = e.SubElement(tr2,'th')
-                    td.text = str(x)
-        else:
+    if len(h) > 1:
+        if len(colgroups[i]) > len(h[1].split('/')):
             td = e.SubElement(tr2,'th')
             td.attrib['colspan'] = str(len(colgroups[i]))
-    
-    rowcount = 0
-    for row in data:
-        if rowcount == 0:
-            cls = 'altrow1'
+            td.text = str(h[1])
         else:
-            cls = 'altrow2'
-        tr = e.SubElement(t, 'tr', CLASS=cls)
-        rowcount += 1
-        if rowcount> 1:
-            rowcount = 0
-        else:
+            for x in h[1].split('/'):
+                td = e.SubElement(tr2,'th')
+                td.text = str(x)
+    else:
+        td = e.SubElement(tr2,'th')
+        td.attrib['colspan'] = str(len(colgroups[i]))
+
+rowcount = 0
+for row in data:
+    if rowcount == 0:
+        cls = 'altrow1'
+    else:
+        cls = 'altrow2'
+    tr = e.SubElement(t, 'tr', CLASS=cls)
+    rowcount += 1
+    if rowcount> 1:
+        rowcount = 0
+    else:
+        cls = ''
+    for i in colgroups:
+        for j in colgroups[i]:
+            td = e.SubElement(tr, 'td')
             cls = ''
-        for i in colgroups:
-            for j in colgroups[i]:
-                td = e.SubElement(tr, 'td')
-                cls = ''
-                if type(row[j]).__name__ == 'int':
-                    cls = 'number'
+            if type(row[j]).__name__ == 'int':
+                cls = 'number'
+            else:
+                cls='text'
+            #if j in ['Gender', 'Age Group']:
+            #    cls = 'centered'
+            if j == 'Rank':
+                cls = 'firstcol number' 
+            if row == data[-1]:
+                cls += ' lastrow'
+            if 'Arrow' in j:
+                icls = 'arrow'
+                if j == 'RankArrow':
+                    switch = row['AbsRankChange']
                 else:
-                    cls='text'
-                #if j in ['Gender', 'Age Group']:
-                #    cls = 'centered'
-                if j == 'Rank':
-                    cls = 'firstcol number' 
-                if row == data[-1]:
-                    cls += ' lastrow'
-                if 'Arrow' in j:
-                    icls = 'arrow'
-                    if j == 'RankArrow':
-                        switch = row['AbsRankChange']
-                    else:
-                        switch = row['wIndexChange']
-                    if switch < 0:
-                        icls += ' down'
-                    if switch == 0:
-                        icls += ' right'
-                    if switch > 0:
-                        icls += ' up'
-                    row[j] = e.SubElement(td, 'i')
-                    row[j].attrib['class'] = icls
-                if len(cls) > 0:
-                    td.attrib['class'] = cls
-                if type(row[j]).__name__ in ['int', 'float', 'str']:
-                    td.text = fstr(row[j])
+                    switch = row['wIndexChange']
+                if switch < 0:
+                    icls += ' down'
+                if switch == 0:
+                    icls += ' right'
+                if switch > 0:
+                    icls += ' up'
+                row[j] = e.SubElement(td, 'i')
+                row[j].attrib['class'] = icls
+            if len(cls) > 0:
+                td.attrib['class'] = cls
+            if type(row[j]).__name__ in ['int', 'float', 'str']:
+                td.text = fstr(row[j])
                 
 
 s = e.SubElement(body,'style')
