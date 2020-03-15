@@ -295,7 +295,7 @@ def buildWeeklyParkrunReport():
                             s.attrib['class'] = 'newevent'
                     if row['VolunteerThisWeek'] is not None:
                         if row['VolunteerThisWeek'] > 0:
-                            s = e.SubElement(e.SubElement(td,'p'), 'span')
+                            s = e.SubElement(td, 'span')
                             s.text = f"({fstr(row['LastVolParkrun'])})"
                             s.attrib['class'] = 'volunteer'
                     row[j] = None
