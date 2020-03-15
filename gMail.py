@@ -77,8 +77,6 @@ def CreateMessage(sender, to, subject, message_text):
     message['bcc'] = 'golgothen@gmail.com'
     message['subject'] = subject
     
-    #return {'raw': encoders.encode_base64(message).decode()}
-    #return {'raw': encoders.encode_base64(message.as_bytes()).decode()}
     return {'raw': base64.urlsafe_b64encode(message.as_bytes()).decode()}
 
 def CreateMessageWithAttachment(sender, to, subject, message_text, file_dir, filename):
