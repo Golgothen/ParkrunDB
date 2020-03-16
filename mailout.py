@@ -1,6 +1,6 @@
 import logging, logging.config, multiprocessing, lxml.html, gMail
 
-from lxml import etree as e
+import xml.etree.ElementTree as e
 from mplogger import *
 from dbconnection import Connection
 
@@ -54,6 +54,21 @@ StyleSheet = """
                     color : BlueViolet;
                     font-weight : bold;
                 }
+                .arrowUp {
+                    color : Green;
+                    font-weight : bold;
+                    font-size : 15px;
+                }
+                .arrowDown {
+                    color : Red;
+                    font-weight : bold;
+                    font-size : 15px;
+                }
+                .arrowRight {
+                    color : Blue;
+                    font-weight : bold;
+                    font-size : 15px;
+                }
                 tr, td {
                     font-size : 14px;
                     vertical-align : middle;
@@ -73,34 +88,6 @@ StyleSheet = """
                 }
                 h3 {
                     padding : 20px;
-                }
-                i {
-                  border: solid black;
-                  border-width: 0 1px 1px 0;
-                  display: inline-block;
-                  padding: 3px;
-                }
-                
-                .right {
-                  transform: rotate(-45deg);
-                  -webkit-transform: rotate(-45deg);
-                }
-                
-                .left {
-                  transform: rotate(135deg);
-                  -webkit-transform: rotate(135deg);
-                }
-                
-                .up {
-                  border: solid ForestGreen;
-                  transform: rotate(-135deg);
-                  -webkit-transform: rotate(-135deg);
-                }
-                
-                .down {
-                  border: solid red;
-                  transform: rotate(45deg);
-                  -webkit-transform: rotate(45deg);
                 }
                 
             """
@@ -204,6 +191,12 @@ def buildSummaryParkrunReport(parkrun, node):
 
 def buildWeeklyParkrunReport():
 
+    root = e.Element('html', version = '5.0')
+    body = e.SubElement(root, 'body')
+
+    p = e.SubElement(body, 'p')
+    p.text = 'Good morning fellow parkrunners!'
+
     c = Connection(config)
     data = c.execute(f"SELECT * FROM getStatesmanReport(100, 'Victoria') ORDER BY Rank, TQTY DESC")
     
@@ -220,8 +213,7 @@ def buildWeeklyParkrunReport():
         'P<br>Index'            : ['pIndex'],
         'Wilson<br>Index'       : ['wIndex', 'WIndexArrow', 'wIndexChange']
         }
-    root = e.Element('html', version = '5.0')
-    body = e.SubElement(root, 'body')
+    
     t = e.SubElement(body,'table')
     thead = e.SubElement(t,'thead')
     tr1 = e.SubElement(thead,'tr')
@@ -284,7 +276,9 @@ def buildWeeklyParkrunReport():
                     if switch > 0:
                         arr = ' &uarr; '
                         scls = ' arrowUp'
-                    s = e.XML(f'<span class = {scls}>{arr}</span>')
+                    s = e.SubElement(td,'span')
+                    s.attrib['class'] = scls
+                    s.text = arr
                     row[j] = s
                 if i == 'Parkrun':
                     if row['LastRunParkrunThisWeek'] > 0:
@@ -302,9 +296,13 @@ def buildWeeklyParkrunReport():
                     td.attrib['class'] = cls
                 if type(row[j]).__name__ in ['int', 'float', 'str']:
                     td.text = fstr(row[j])
+    
     s = e.SubElement(body,'style')
     s.text = StyleSheet
-    lxml.html.open_in_browser(root)    
+    x = e.tostring(root).decode('utf-8').replace('&amp;','&')
+    with open('output.html','w') as f:
+        f.write(x)
+        #lxml.html.open_in_browser(root)    
 
 
 def subRegionStatsReport():
