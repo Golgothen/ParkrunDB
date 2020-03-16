@@ -32,10 +32,10 @@ StyleSheet = """
                     background-color: LightGreen
                 }
                 .lastrow {
-                    border-bottom : 1px solid black;
+                    border-bottom : 1px solid white;
                 }
                 .firstcol {
-                    border-left : 1px solid black;
+                    border-left : 1px solid white;
                 }
                 .text {
                     text-align : left;
@@ -46,15 +46,20 @@ StyleSheet = """
                 .centered {
                     text-align : center;
                 }
-                .arrow {
-                    font-family : wingdings;
+                .newevent {
+                    color : ForestGreen;
+                    font-weight : bold;
+                }
+                .volunteer {
+                    color : BlueViolet;
+                    font-weight : bold;
                 }
                 tr, td {
                     font-size : 14px;
                     vertical-align : middle;
                     padding : 5px;
-                    border-top: 1px solid black;
-                    border-right: 1px solid black;
+                    border-top: 1px solid white;
+                    border-right: 1px solid white;
                     border-bottom : 0;
                     border-left : 0;
                 }
@@ -63,13 +68,15 @@ StyleSheet = """
                     font-weight : normal;
                     text-align : center;
                     padding : 4px;
+                    padding-left : 12px;
+                    padding-right : 12px;
                 }
                 h3 {
                     padding : 20px;
                 }
                 i {
                   border: solid black;
-                  border-width: 0 3px 3px 0;
+                  border-width: 0 1px 1px 0;
                   display: inline-block;
                   padding: 3px;
                 }
@@ -85,14 +92,17 @@ StyleSheet = """
                 }
                 
                 .up {
+                  border: solid ForestGreen;
                   transform: rotate(-135deg);
                   -webkit-transform: rotate(-135deg);
                 }
                 
                 .down {
+                  border: solid red;
                   transform: rotate(45deg);
                   -webkit-transform: rotate(45deg);
-                }                
+                }
+                
             """
 
 
@@ -192,99 +202,188 @@ def buildSummaryParkrunReport(parkrun, node):
                 td.attrib['class'] = cls
     #return root #lxml.html.tostring()
 
-def buildWeeklyParkrunReport(node):
+def buildWeeklyParkrunReport():
 
+    c = Connection(config)
+    data = c.execute(f"SELECT * FROM getStatesmanReport(100, 'Victoria') ORDER BY Rank, TQTY DESC")
     
-c = Connection(config)
-data = c.execute(f"SELECT * FROM getStatesmanReport(100, 'Victoria') ORDER BY Rank, TQTY DESC")
-
-colgroups = {
-    'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
-    'Weeks<br>Held'         : ['Weeks'],
-    'Athlete'               : ['FirstName', 'LastName'],
-    'Events<br>Local/Total' : ['Events', 'DifferentEvents'],
-    'Total<br>Runs'         : ['EventCount'],
-    'Tourist<br>Quotient'   : ['TQ', 'TQTY'],
-    'This Year<br>Run/New'  : ['TYEventsDone', 'TYNewEvents'],
-    'Last Year<br>Run/New'  : ['LYEventsDone', 'LYNewEvents'],
-    'P<br>Index'            : ['pIndex'],
-    'Wilson<br>Index'       : ['wIndex', 'WIndexArrow', 'wIndexChange']
-    }
-root = e.Element('html', version = '5.0')
-body = e.SubElement(root, 'body')
-node = body
-t = e.SubElement(node,'table')
-thead = e.SubElement(t,'thead')
-tr1 = e.SubElement(thead,'tr')
-tr2 = e.SubElement(thead,'tr')
-for i in colgroups:
-    h = str(i).split('<br>')
-    td = e.SubElement(tr1,'th')
-    td.text = h[0]
-    td.attrib['colspan'] = str(len(colgroups[i]))
+    colgroups = {
+        'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
+        'Weeks<br>Held'         : ['Weeks'],
+        'Athlete'               : ['AthleteName'],
+        'Parkrun'               : ['LastRunParkrun'],
+        'Events<br>Local/Total' : ['Events', 'DifferentEvents'],
+        'Total<br>Runs'         : ['EventCount'],
+        'Tourist<br>Quotient'   : ['TQ', 'TQTY'],
+        'This Year<br>Run/New'  : ['TYEventsDone', 'TYNewEvents'],
+        'Last Year<br>Run/New'  : ['LYEventsDone', 'LYNewEvents'],
+        'P<br>Index'            : ['pIndex'],
+        'Wilson<br>Index'       : ['wIndex', 'WIndexArrow', 'wIndexChange']
+        }
+    root = e.Element('html', version = '5.0')
+    body = e.SubElement(root, 'body')
+    t = e.SubElement(body,'table')
+    thead = e.SubElement(t,'thead')
+    tr1 = e.SubElement(thead,'tr')
+    tr2 = e.SubElement(thead,'tr')
     
-    if len(h) > 1:
-        if len(colgroups[i]) > len(h[1].split('/')):
+    for i in colgroups:
+        h = str(i).split('<br>')
+        td = e.SubElement(tr1,'th')
+        td.text = h[0]
+        td.attrib['colspan'] = str(len(colgroups[i]))
+        
+        if len(h) > 1:
+            if len(colgroups[i]) > len(h[1].split('/')):
+                td = e.SubElement(tr2,'th')
+                td.attrib['colspan'] = str(len(colgroups[i]))
+                td.text = str(h[1])
+            else:
+                for x in h[1].split('/'):
+                    td = e.SubElement(tr2,'th')
+                    td.text = str(x)
+        else:
             td = e.SubElement(tr2,'th')
             td.attrib['colspan'] = str(len(colgroups[i]))
-            td.text = str(h[1])
+    
+    rowcount = 0
+    for row in data:
+        if rowcount == 0:
+            cls = 'altrow1'
         else:
-            for x in h[1].split('/'):
-                td = e.SubElement(tr2,'th')
-                td.text = str(x)
-    else:
-        td = e.SubElement(tr2,'th')
-        td.attrib['colspan'] = str(len(colgroups[i]))
-
-rowcount = 0
-for row in data:
-    if rowcount == 0:
-        cls = 'altrow1'
-    else:
-        cls = 'altrow2'
-    tr = e.SubElement(t, 'tr', CLASS=cls)
-    rowcount += 1
-    if rowcount> 1:
-        rowcount = 0
-    else:
-        cls = ''
-    for i in colgroups:
-        for j in colgroups[i]:
-            td = e.SubElement(tr, 'td')
-            cls = ''
-            if type(row[j]).__name__ == 'int':
-                cls = 'number'
-            else:
-                cls='text'
-            #if j in ['Gender', 'Age Group']:
-            #    cls = 'centered'
-            if j == 'Rank':
-                cls = 'firstcol number' 
-            if row == data[-1]:
-                cls += ' lastrow'
-            if 'Arrow' in j:
-                icls = 'arrow'
-                if j == 'RankArrow':
-                    switch = row['AbsRankChange']
+            cls = 'altrow2'
+        tr = e.SubElement(t, 'tr', CLASS=cls)
+        rowcount += 1
+        if rowcount> 1:
+            rowcount = 0
+        for i in colgroups:
+            for j in colgroups[i]:
+                td = e.SubElement(tr, 'td')
+                cls = ''
+                if type(row[j]).__name__ in ['int', 'float']:
+                    cls = 'number'
                 else:
-                    switch = row['wIndexChange']
-                if switch < 0:
-                    icls += ' down'
-                if switch == 0:
-                    icls += ' right'
-                if switch > 0:
-                    icls += ' up'
-                row[j] = e.SubElement(td, 'i')
-                row[j].attrib['class'] = icls
-            if len(cls) > 0:
-                td.attrib['class'] = cls
-            if type(row[j]).__name__ in ['int', 'float', 'str']:
-                td.text = fstr(row[j])
-                
+                    cls='text'
+                if j in ['Weeks']:
+                    cls = 'centered'
+                if j == 'Rank':
+                    cls += ' firstcol' 
+                if row == data[-1]:
+                    cls += ' lastrow'
+                if 'Arrow' in j:
+                    if j == 'RankArrow':
+                        switch = row['RankChange']
+                    else:
+                        switch = row['wIndexChange']
+                    if switch < 0:
+                        arr = ' &darr; '
+                        scls = ' arrowDown'
+                    if switch == 0:
+                        arr = ' &rarr; '
+                        scls = ' arrowRight'
+                    if switch > 0:
+                        arr = ' &uarr; '
+                        scls = ' arrowUp'
+                    s = e.XML(f'<span class = {scls}>{arr}</span>')
+                    row[j] = s
+                if i == 'Parkrun':
+                    if row['LastRunParkrunThisWeek'] > 0:
+                        s = e.SubElement(e.SubElement(td,'p'), 'span')
+                        s.text = fstr(row['LastRunParkrun'])
+                        if row['EventChange'] > 0:
+                            s.attrib['class'] = 'newevent'
+                    if row['VolunteerThisWeek'] is not None:
+                        if row['VolunteerThisWeek'] > 0:
+                            s = e.SubElement(td, 'span')
+                            s.text = f"({fstr(row['LastVolParkrun'])})"
+                            s.attrib['class'] = 'volunteer'
+                    row[j] = None
+                if len(cls) > 0:
+                    td.attrib['class'] = cls
+                if type(row[j]).__name__ in ['int', 'float', 'str']:
+                    td.text = fstr(row[j])
+    s = e.SubElement(body,'style')
+    s.text = StyleSheet
+    lxml.html.open_in_browser(root)    
 
-s = e.SubElement(body,'style')
-s.text = StyleSheet
-lxml.html.open_in_browser(root)    
+
+def subRegionStatsReport():
+    c = Connection(config)
+
+    service = gMail.auth()
+    
+    
+    
+    maillist = c.execute('SELECT Email, AddressTo, SubRegionName from SubRegions WHERE Email IS NOT NULL')
+    for m in maillist:
+        root = e.Element('html', version = '5.0')
+        body = e.SubElement(root, 'body')
+        p = e.SubElement(body,'p')
+        p.text = f"Hi {m['AddressTo']}. Below is this weeks {m['SubRegionName']} stats"
+        p = e.SubElement(e.SubElement(body,'p'),'br')
+        
+        stats = c.execute(f"select ParkrunName as Parkrun, TotalRunners as Finishers, TotalVolunteers as Volunteers, Total, LastYear as [Last Year], LastYearP as [Last Year %], CalendarType from qrySubRegionStats where SubRegionName = '{m['SubRegionName']}'")
+        
+        t = e.SubElement(body,'table')
+        thead = e.SubElement(t,'thead')
+        tr = e.SubElement(thead,'tr')
+        for i in list(stats[0].keys()):
+            if i in ['CalendarType']:
+                continue
+            td = e.SubElement(tr,'th')
+            td.text = i
+            td.attrib['class'] = 'header'
+        
+        rowcount = 0
+        for row in stats:
+            if rowcount == 0:
+                cls = 'altrow1'
+            else:
+                cls = 'altrow2'
+            tr = e.SubElement(t, 'tr', CLASS=cls)
+            rowcount += 1
+            if rowcount> 1:
+                rowcount = 0
+            else:
+                cls = ''
+            if row['CalendarType'] == 'Cancellation':
+                row['Finishers'] = 'Cancelled'
+                row['Volunteers'] = ''
+                row['Total'] = ''
+                row['Last Year %'] = ''
+                row['Last Year'] = ''
+            for k, v in row.items():
+                if k in ['CalendarType']:
+                    continue
+                cls = ''
+                td = e.SubElement(tr, 'td')
+                if type(v).__name__ in ['int', 'float', 'decimal.Decimal']:
+                    cls = 'number'
+                else:
+                    cls='text'
+                if k in ['Gender', 'Age Group']:
+                    cls = 'centered'
+                if k == 'Parkrun':
+                    cls = 'firstcol text' 
+                if row == stats[-1]:
+                    cls += ' lastrow'
+                if len(cls) > 0:
+                    td.attrib['class'] = cls
+                if len(fstr(v)) > 0:
+                    td.text = fstr(v)
+        
+        p = e.SubElement(e.SubElement(body,'p'),'br')
+        p = e.SubElement(body,'p')
+        p.text = 'This email is automatically generated.  I have tested the process of generating it as much as I could, however there may be issues in the future that arise that I have not yet tested for.'
+        p = e.SubElement(body,'p')
+        p.text = "If there are any errors in the data, or the email it's self, then please let me know so I can correct them."
+        p = e.SubElement(e.SubElement(body,'p'),'br')
+        p = e.SubElement(body,'p')
+        p.text = 'Cheers, Paul Ellis.'
+
+        s = e.SubElement(body,'style')
+        s.text = StyleSheet
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"{m['SubRegionName']} stats for this weekend", lxml.html.tostring(root).decode('utf-8')))
 
 def parkrunMilestoneMailout():
     

