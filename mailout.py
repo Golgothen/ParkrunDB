@@ -193,53 +193,48 @@ def buildSummaryParkrunReport(parkrun, node):
     #return root #lxml.html.tostring()
 
 def buildWeeklyParkrunReport():
-
     region = 'Victoria'
-    
     root = e.Element('html', version = '5.0')
     body = e.SubElement(root, 'body')
-
     p = e.SubElement(body, 'p')
     p.text = 'Good morning fellow parkrunners!'
     c = Connection(config)
     
-
     data = c.execute(f"select top(5) ParkrunName, ThisWeek, RunnersChange from qryWeeklyParkrunEventSize where Region='{region}' order by ThisWeek desc")
     p = e.SubElement(root, 'p')
     p.text = "The largest events were "
     for row in data:
         p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
-
-    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+    
+    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' order by LastWeekP desc")
     p = e.SubElement(root, 'p')
     p.text = "The largest increase by percentage was "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
-
-    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['LastWeekP'])}{abs(row['LastWeekP']):.0f}%){concat(row,data)}"
+    
+    data = c.execute(f"select top(5) ParkrunName, PBs from getTop5PBs('{region}') order by PBs desc")
     p = e.SubElement(root, 'p')
-    p.text = "The largest increase by percentage was "
+    p.text = "The most PBs were at "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
-
-    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+        p.text += f"{row['ParkrunName']} ({row['PBs']}){concat(row,data)}"
+    
+    data = c.execute(f"select top(5) ParkrunName, PBs, Percentage from getTop5PBsByPercent('{region}') order by Percentage desc")
     p = e.SubElement(root, 'p')
-    p.text = "The largest increase by percentage was "
+    p.text = "The most PBs by percentage of field was "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
-
-    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+        p.text += f"{row['ParkrunName']} ({row['PBs']} or {row['Percentage']:.0f}%){concat(row,data)}"
+    
+    data = c.execute(f"select top(5) ParkrunName, FirstTimers, Percentage from getTop5FirstTimers('{region}') order by FirstTimers desc")
     p = e.SubElement(root, 'p')
-    p.text = "The largest increase by percentage was "
+    p.text = "The most first timers were at "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
-
-    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+        p.text += f"{row['ParkrunName']} ({row['FirstTimers']}){concat(row,data)}"
+    
+    data = c.execute(f"select top(5) ParkrunName, FirstTimers, Percentage from getTop5FirstTimersByPercent('{region}') order by Percentage desc")
     p = e.SubElement(root, 'p')
-    p.text = "The largest increase by percentage was "
+    p.text = "The most first timers by percentage of field was at "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
-
+        p.text += f"{row['ParkrunName']} ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
     
     s = e.SubElement(body,'style')
     s.text = StyleSheet
