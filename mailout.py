@@ -6,6 +6,9 @@ from dbconnection import Connection
 
 fstr = lambda s: '' if s is None else str(s)
 
+direction = lambda s: ' down ' if s < 0 else (' steady at ' if s == 0 else ' up ')
+concat = lambda r, d: ' and ' if r == d[-2] else ('.' if r == d[-1] else ', ')
+
 loggingQueue = multiprocessing.Queue()
 config = sender_config
 config['handlers']['queue']['queue'] = loggingQueue
@@ -191,14 +194,61 @@ def buildSummaryParkrunReport(parkrun, node):
 
 def buildWeeklyParkrunReport():
 
+    region = 'Victoria'
+    
     root = e.Element('html', version = '5.0')
     body = e.SubElement(root, 'body')
 
     p = e.SubElement(body, 'p')
     p.text = 'Good morning fellow parkrunners!'
-
     c = Connection(config)
-    data = c.execute(f"SELECT * FROM getStatesmanReport(100, 'Victoria') ORDER BY Rank, TQTY DESC")
+    
+
+    data = c.execute(f"select top(5) ParkrunName, ThisWeek, RunnersChange from qryWeeklyParkrunEventSize where Region='{region}' order by ThisWeek desc")
+    p = e.SubElement(root, 'p')
+    p.text = "The largest events were "
+    for row in data:
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
+
+    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+    p = e.SubElement(root, 'p')
+    p.text = "The largest increase by percentage was "
+    for row in data:
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
+
+    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+    p = e.SubElement(root, 'p')
+    p.text = "The largest increase by percentage was "
+    for row in data:
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
+
+    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+    p = e.SubElement(root, 'p')
+    p.text = "The largest increase by percentage was "
+    for row in data:
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
+
+    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+    p = e.SubElement(root, 'p')
+    p.text = "The largest increase by percentage was "
+    for row in data:
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
+
+    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region={region} order by LastWeekP desc")
+    p = e.SubElement(root, 'p')
+    p.text = "The largest increase by percentage was "
+    for row in data:
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
+
+    
+    s = e.SubElement(body,'style')
+    s.text = StyleSheet
+    x = e.tostring(root).decode('utf-8').replace('&amp;','&')
+    with open('output.html','w') as f:
+        f.write(x)
+    return
+
+    data = c.execute(f"SELECT * FROM getStatesmanReport(100, '{region}') ORDER BY Rank, TQTY DESC")
     
     colgroups = {
         'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
