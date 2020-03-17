@@ -1,14 +1,15 @@
 from mplogger import *
 
 from dbconnection import Connection
-from urllib.request import urlopen, Request #, localhost
-from urllib.error import HTTPError
+#from urllib.request import urlopen, Request #, localhost
+#from urllib.error import HTTPError
 from time import sleep
 from timeit import default_timer as timer
 from parkrunlist import ParkrunList
 from worker import *
 
-import logging, logging.config, multiprocessing, lxml.html, argparse
+import logging, logging.config, multiprocessing, lxml.html, argparse, requests
+from requests.exceptions import HTTPError
 
 intervals = (
     ('weeks', 604800),  # 60 * 60 * 24 * 7
@@ -33,10 +34,14 @@ def display_time(seconds, granularity=2):
 def getURL(url):
     completed = False
     while not completed:
-        try:
-            logger.debug('Hitting {}'.format(url))
-            f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}))
-            completed = True
+        logger.debug('Hitting {}'.format(url))
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}, timeout = 10)
+        if response.status_code != 200:
+            logger.warning('Got HTTP Error {}'.format(e.code))
+        if response.status_code in [404, 403]:
+            return None
+        completed = True
+        """
         except HTTPError as e:
             logger.warning('Got HTTP Error {}'.format(e.code))
             if e.code == 404:
@@ -51,7 +56,8 @@ def getURL(url):
             logger.warning('Unexpected network error. URL: ' + url)
             #self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
             return None
-    temp = f.read().decode('utf-8', errors='ignore')
+        """
+    temp = response.text#.decode('utf-8', errors='ignore')
     #self.logger.debug('URL returned string of length {}'.format(len(temp)))
     return lxml.html.fromstring(temp) 
 
