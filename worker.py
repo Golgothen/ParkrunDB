@@ -397,9 +397,9 @@ class Worker(multiprocessing.Process):
             for i in range(len(roster[0][1])):
                 #Some positions on the roster are empty.  Ignore these.
                 if roster[0][1][i][1].text is not None:
-                     for v in volunteers:
-                         if v['NameString'] == roster[0][1][i][1].text:
-                             v['Volunteer'][roster[0][1][i][0][0].text] = 1
+                    for v in volunteers:
+                        if v['NameString'] == roster[0][1][i][1].text:
+                            v['Volunteer'][roster[0][1][i][0][0].text] = 1
                               
         else:
             #Roster is not available, do it the old way
