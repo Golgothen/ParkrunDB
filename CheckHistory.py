@@ -35,10 +35,13 @@ def getURL(url):
     completed = False
     while not completed:
         logger.debug('Hitting {}'.format(url))
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}, timeout = 10)
-        if response.status_code != 200:
-            logger.warning('Got HTTP Error {}'.format(e.code))
-        if response.status_code in [404, 403]:
+        try:
+            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}, timeout = 10)
+            if response.status_code != 200:
+                logger.warning('Got HTTP Error {}'.format(e.code))
+            if response.status_code in [404, 403]:
+                return None
+        except:
             return None
         completed = True
         """
