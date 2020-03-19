@@ -89,7 +89,7 @@ class Connection():
         if athlete['Age Cat'] in self.cachedAgeCat:
             return self.cachedAgeCat[athlete['Age Cat']]
         else:
-            self.logger.info(athlete['Age Cat'])
+            self.logger.info(athlete)
             ageGroup = athlete['Age Cat'][2:]
             if ageGroup == '---':
                 ageCat = 'S'
@@ -97,18 +97,22 @@ class Connection():
                 ageCat = ''
                 ageGroup = 'WC'
             else:
-                startage = int(ageGroup.replace('+','').split('-')[0])
-                if startage in [10, 11, 15]:
-                    ageCat = 'J'
-                if startage in [18, 20, 25, 30]:
+                try:
+                    startage = int(ageGroup.replace('+','').split('-')[0])
+                    if startage in [10, 11, 15]:
+                        ageCat = 'J'
+                    if startage in [18, 20, 25, 30]:
+                        ageCat = 'S'
+                    if startage > 30:
+                        ageCat = 'V'
+                except:
                     ageCat = 'S'
-                if startage > 30:
-                    ageCat = 'V'
+                    ageGroup = '---'
             if athlete['Gender'] == 'M':
                 ageCat += 'M' + ageGroup
             else:
                 ageCat += 'W' + ageGroup
-            self.logger.debug('Improvised AgeCat lookup.  Came up with {} from {}'.format(ageCat, athlete['Age Cat']))
+            self.logger.info('Improvised AgeCat lookup.  Came up with {} from {}'.format(ageCat, athlete['Age Cat']))
             return self.cachedAgeCat[ageCat]
     
     def addParkrunEvent(self, parkrun):
