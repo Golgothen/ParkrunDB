@@ -1,14 +1,18 @@
-import logging, logging.config, multiprocessing, lxml.html, gMail
+import logging, logging.config, multiprocessing, lxml.html, gMail, math
 
 import xml.etree.ElementTree as e
 from mplogger import *
 from dbconnection import Connection
+from datetime import date
 
 fstr = lambda s: '' if s is None else str(s)
 
 direction = lambda s: 'down' if s < 0 else ('steady at' if s == 0 else 'up')
 concat = lambda r, d: ' and ' if r == d[-2] else ('.' if r == d[-1] else ', ')
-
+ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(math.floor(n/10)%10!=1)*(n%10<4)*n%10::4])
+formattime = lambda s: s.strftime('%M:%S') if s.hour == 0 else s.strftime('%H:%M:%S')
+guntimedelta = lambda o, n: datetime.combine(date.min, o) - datetime.combine(date.min, n) 
+ 
 loggingQueue = multiprocessing.Queue()
 config = sender_config
 config['handlers']['queue']['queue'] = loggingQueue
@@ -29,10 +33,10 @@ StyleSheet = """
                     background-color: Yellow
                 }
                 .altrow1 {
-                    background-color: SpringGreen
+                    background-color: GhostWhite
                 }
                 .altrow2 {
-                    background-color: LightGreen
+                    background-color: Gainsboro
                 }
                 .lastrow {
                     border-bottom : 1px solid white;
@@ -91,6 +95,29 @@ StyleSheet = """
                 }
                 h3 {
                     padding : 20px;
+                }
+                .parkrunname {
+                    font-weight: bold;
+                }
+                .approachingmilestone {
+                    font-weight: bold;
+                    color: Orange;
+                }
+                .milestone50 {
+                    font-weight: bold;
+                    color: Red;
+                }
+                .milestone100 {
+                    font-weight: bold;
+                    color: Black;
+                }
+                .milestone250 {
+                    font-weight: bold;
+                    color: Green;
+                }
+                .milestone500 {
+                    font-weight: bold;
+                    color: Blue;
                 }
                 
             """
@@ -199,11 +226,13 @@ def buildWeeklyParkrunReport():
     p = e.SubElement(body, 'h3')
     p.text = 'Good morning fellow parkrunners!'
     p = e.SubElement(body, 'p')
+    p.text = f"Welcome to the weekly parkrun report for {date.today().strftime('%A')}, the {ordinal(date.today().day)} of {date.today().strftime('%B, %Y')}." 
+    p = e.SubElement(body, 'p')
     br = e.SubElement(p, 'br')
     c = Connection(config)
     
     data = c.execute(f"select ParkrunName from getParkrunCancellations('{region}') order by ParkrunName")
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = "As of writing "
     if len(data) == 0:
         p.text += "there were no cancellations"
@@ -243,52 +272,187 @@ def buildWeeklyParkrunReport():
     TotalRunners = c.execute(f"select dbo.getWeeklyTotalRunners('{region}')")
     TotalRunnersLastWeek = c.execute(f"select dbo.getWeeklyTotalRunnersLastWeek('{region}')")
     
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = f"We had {TotalRunners:,.0f} ({direction(TotalRunners - TotalRunnersLastWeek)} by {abs(TotalRunners - TotalRunnersLastWeek):,.0f} or {abs(TotalRunnersLastWeek - TotalRunners) / TotalRunners:.2%}), with {TotalPBs:,.0f} PB's ({TotalPBs / TotalRunners:.2%}), {Tourists:,.0f} tourists visiting new events for the first time, and {FirstTimers:,.0f} first timers, supported by {Volunteers} volunteers."
 
     data = c.execute(f"select top(5) ParkrunName, ThisWeek, RunnersChange from qryWeeklyParkrunEventSize where Region='{region}' order by ThisWeek desc")
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = "The largest events were "
     for row in data:
         p.text += f"{row['ParkrunName']} ({row['ThisWeek']}, {direction(row['RunnersChange'])} {abs(row['RunnersChange'])}){concat(row,data)}"
     
     data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' order by LastWeekP desc")
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = "The largest increase by percentage was "
     for row in data:
         p.text += f"{row['ParkrunName']} ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
     
     data = c.execute(f"select top(5) ParkrunName, PBs from getTop5PBs('{region}') order by PBs desc")
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = "The most PBs were at "
     for row in data:
         p.text += f"{row['ParkrunName']} ({row['PBs']}){concat(row,data)}"
     
     data = c.execute(f"select top(5) ParkrunName, PBs, Percentage from getTop5PBsByPercent('{region}') order by Percentage desc")
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = "The most PBs by percentage of field was "
     for row in data:
         p.text += f"{row['ParkrunName']} ({row['PBs']} or {row['Percentage']:.0f}%){concat(row,data)}"
     
     data = c.execute(f"select top(5) ParkrunName, FirstTimers, Percentage from getTop5FirstTimers('{region}') order by FirstTimers desc")
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = "The most first timers were at "
     for row in data:
         p.text += f"{row['ParkrunName']} ({row['FirstTimers']}){concat(row,data)}"
     
     data = c.execute(f"select top(5) ParkrunName, FirstTimers, Percentage from getTop5FirstTimersByPercent('{region}') order by Percentage desc")
-    p = e.SubElement(root, 'p')
+    p = e.SubElement(body, 'p')
     p.text = "The most first timers by percentage of field was at "
     for row in data:
         p.text += f"{row['ParkrunName']} ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
     
+    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestFemale as q where q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
+    p = e.SubElement(body, 'p')
+    p.text = f"The {len(data)} fastest females in {region} by age category, in pace order, were:"
+    l = e.SubElement(p,'ol')
+    for row in data:
+        li = e.SubElement(l,'li')
+        li.text = f"{row['Athlete']} ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
+        if row['Comment'] not in [None, 'PB']:
+            if row['Comment'] == 'New PB!':
+                li.text += ' setting herself a new PB'
+            else:
+                li.text += ' for the first time'
+        li.text += '.'
+        
+    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestMale as q where q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
+    p = e.SubElement(body, 'p')
+    p.text = f"The {len(data)} fastest males in {region} by age category, in pace order, were:"
+    l = e.SubElement(p,'ol')
+    for row in data:
+        li = e.SubElement(l,'li')
+        li.text = f"{row['Athlete']} ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
+        if row['Comment'] not in [None, 'PB']:
+            if row['Comment'] == 'New PB!':
+                li.text += ' setting himself a new PB'
+            else:
+                li.text += ' for the first time'
+        li.text += '.'
+    
+    
+    milestones = [500, 250, 100, 50]
+    
+    for m in milestones:
+        data = c.execute(f"select * from getWeeklyMilestones('{region}', {m}) order by ParkrunName, LastName")
+        if len(data) > 0:
+            p = e.SubElement(body, 'p')
+            if len(data) > 1:
+                p.text = f"The following {len(data)} athletes join the {m} club this week:"
+            else:
+                p.text = f"Just one athlete joined the {m} club this week:"
+            l = e.SubElement(p, 'ul')
+            currentParkrun = data[0]['ParkrunName']
+            li = e.SubElement(l, 'li')
+            s = e.SubElement(li, 'span')
+            s.attrib['class'] = 'parkrunname'
+            s.text = currentParkrun + ': '
+            n = e.SubElement(li, 'span')
+            n.text = ''
+            for row in data:
+                if row['ParkrunName'] != currentParkrun:
+                    n.text = n.text[:-2]
+                    currentParkrun = row['ParkrunName']
+                    li = e.SubElement(l, 'li')
+                    s = e.SubElement(li, 'span')
+                    s.attrib['class'] = 'parkrunname'
+                    s.text = currentParkrun + ': '
+                    n = e.SubElement(li, 'span')
+                    n.text = ''
+                n.text += f"{row['FirstName']} {row['LastName']}, "
+            n.text = n.text[:-2]
+                
+    
+    
+    data = c.execute(f"select * from qryParkrunRecordsBrokenThisWeek where Region = '{region}' order by ParkrunName")    
+    p = e.SubElement(body, 'p')
+    if len(data) == 0:
+        p.text = 'There were no course records broken this week.'
+    else:
+        if len(data) == 1:
+            p.text = f'There was just one course record broken this week:'
+        else:
+            p.text = f'There were {len(data)} course records broken this week:'
+        l = e.SubElement(p, 'ul')
+        for row in data:
+            li = e.SubElement(l, 'li')
+            s = e.SubElement(li, 'span')
+            s.attrib['class'] = 'parkrunname'
+            s.text = row['ParkrunName'] + ': '
+            n = e.SubElement(li, 'span')
+            n.text = f"{row['FirstName']} {row['LastName']} "
+            rd = guntimedelta(row['PreviousRecord'], row['GunTime']).seconds 
+            if rd > 60:
+                margin = 'smashed'
+            elif 20 < rd <= 60:
+                margin = 'broke'
+            else:
+                margin = 'took'
+            if row['FirstName'] == row['PreviousRecordHolderFirstName'] and row['LastName'] == row['PreviousRecordHolderLastName']:
+                if row['Gender'] == 'F':
+                    taken = f'her own record'
+                else:
+                    taken = f'his own record'
+            else:
+                taken = f"{row['PreviousRecordHolderFirstName']} {row['PreviousRecordHolderLastName']}'s record"
+            n.text += f"{margin} {taken} by {guntimedelta(row['PreviousRecord'], row['GunTime']).seconds} seconds"
+            if row['Comment'] == 'New PB!' and 'own record' not in taken:
+                if row['Gender'] == 'F':
+                    n.text += f', setting herself a new PB'
+                else:
+                    n.text += f', setting himself a new PB'
+            n.text += '.'
+    
+    data = c.execute(f"select * from qryEventRecordsBrokenThisWeek WHERE Region = '{region}'")
+    p = e.SubElement(body, 'p')
+    if len(data) == 0:
+        p.text = 'There were no attendance records broken this week.'
+    else:
+        if len(data) == 1:
+            p.text = f'There was just one attendance record broken this week:'
+        else:
+            p.text = f'There were {len(data)} attendance records broken this week:'
+        l = e.SubElement(p, 'ul')
+        for row in data:
+            li = e.SubElement(l, 'li')
+            s = e.SubElement(li, 'span')
+            s.attrib['class'] = 'parkrunname'
+            s.text = row['ParkrunName'] + ': '
+            n = e.SubElement(li, 'span')
+            rd = row['EventRecord'] - row['PreviousRecord']
+            if rd > 60:
+                margin = 'smashing'
+            else:
+                margin = 'breaking'
+            weeks = (row['EventDate'] - row['PreviousRecordDate']).days/7
+            n.text = f"with {row['EventRecord']}, {margin} their previous record of {row['PreviousRecord']} by {rd}, set "
+            if row['PreviousRecordEvent'] == row['EventNumber'] - 1:
+                n.text += 'last week.'
+            else:
+                if row['PreviousRecordEvent'] == 1:
+                    n.text += f"on their launch "
+                n.text += f"back on the {ordinal(row['PreviousRecordDate'].day)} of {row['PreviousRecordDate'].strftime('%B, %Y')}"
+                
+            
+        
+    """
     s = e.SubElement(body,'style')
     s.text = StyleSheet
     x = e.tostring(root).decode('utf-8').replace('&amp;','&')
     with open('output.html','w') as f:
         f.write(x)
     return
-
+    """
+    
     data = c.execute(f"SELECT * FROM getStatesmanReport(100, '{region}') ORDER BY Rank, TQTY DESC")
     
     colgroups = {
@@ -342,11 +506,10 @@ def buildWeeklyParkrunReport():
         for i in colgroups:
             for j in colgroups[i]:
                 td = e.SubElement(tr, 'td')
-                cls = ''
                 if type(row[j]).__name__ in ['int', 'float']:
                     cls = 'number'
                 else:
-                    cls='text'
+                    cls = 'text'
                 if j in ['Weeks']:
                     cls = 'centered'
                 if j == 'Rank':
@@ -383,6 +546,28 @@ def buildWeeklyParkrunReport():
                             s.text = f"({fstr(row['LastVolParkrun'])})"
                             s.attrib['class'] = 'volunteer'
                     row[j] = None
+                if j == 'DifferentEvents':
+                    if row[j] in [49, 99, 199]:
+                        cls += ' approachingmilestone'
+                if j == 'EventCount':
+                    if row[j] in [49, 99, 249, 499]:
+                        cls += ' approachingmilestone'
+                    if row[j] == 50:
+                        cls += ' milestone50'
+                    if row[j] == 100:
+                        cls += ' milestone100'
+                    if row[j] == 250:
+                        cls += ' milestone250'
+                    if row[j] == 500:
+                        cls += ' milestone500'
+                if j == 'pIndex':
+                    if row['pIndexChange'] > 0:
+                        cls += ' 50milestone'
+                if j == 'wIndex':
+                    if row['wIndexChange'] > 0:
+                        cls += ' 250milestone'
+                
+                        
                 if len(cls) > 0:
                     td.attrib['class'] = cls
                 if type(row[j]).__name__ in ['int', 'float', 'str']:
