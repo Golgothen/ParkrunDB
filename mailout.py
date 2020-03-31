@@ -6,7 +6,7 @@ from dbconnection import Connection
 
 fstr = lambda s: '' if s is None else str(s)
 
-direction = lambda s: ' down ' if s < 0 else (' steady at ' if s == 0 else ' up ')
+direction = lambda s: 'down' if s < 0 else ('steady at' if s == 0 else 'up')
 concat = lambda r, d: ' and ' if r == d[-2] else ('.' if r == d[-1] else ', ')
 
 loggingQueue = multiprocessing.Queue()
@@ -16,7 +16,7 @@ config['handlers']['queue']['queue'] = loggingQueue
 StyleSheet = """ 
                 body {
                     font-family: 'Montserrat', sans-serif;
-                    background-color: Azure
+                    background-color: White
                 }
                 table{
                     border-spacing : 0;
@@ -196,21 +196,67 @@ def buildWeeklyParkrunReport():
     region = 'Victoria'
     root = e.Element('html', version = '5.0')
     body = e.SubElement(root, 'body')
-    p = e.SubElement(body, 'p')
+    p = e.SubElement(body, 'h3')
     p.text = 'Good morning fellow parkrunners!'
+    p = e.SubElement(body, 'p')
+    br = e.SubElement(p, 'br')
     c = Connection(config)
     
+    data = c.execute(f"select ParkrunName from getParkrunCancellations('{region}') order by ParkrunName")
+    p = e.SubElement(root, 'p')
+    p.text = "As of writing "
+    if len(data) == 0:
+        p.text += "there were no cancellations"
+    elif len(data) == 1:
+        p.text = f"{data[0]['ParkrunName']} was the only cancellation"
+    else:
+        for row in data:
+            p.text += f"{row['ParkrunName']}{concat(row,data)}"
+        p.text = p.text[:-1] +  " were the only cancellations"
+
+    data = c.execute(f"select ParkrunName from getParkrunNoResults('{region}') order by ParkrunName")
+    p.text += ", with "
+    if len(data) == 0:
+        p.text += "all other events posting results"
+    elif len(data) == 1:
+        p.text = f"{data[0]['ParkrunName']} the only event yet to post results"
+    else:
+        for row in data:
+            p.text += f"{row['ParkrunName']}{concat(row,data)}"
+        p.text = p.text[:-1] +  " yet to post results"
+
+    data = c.execute(f"select ParkrunName from getParkrunNoVolunteers('{region}') order by ParkrunName")
+    p.text += " and "
+    if len(data) == 0:
+        p.text += "all volunteer information recorded."
+    elif len(data) == 1:
+        p.text = f"{data[0]['ParkrunName']} the only event yet to post volunteer information."
+    else:
+        for row in data:
+            p.text += f"{row['ParkrunName']}{concat(row,data)}"
+        p.text = p.text[:-1] +  " yet to post volunteer information."
+
+    FirstTimers = c.execute(f"select dbo.getWeeklyFirstTimers('{region}')")
+    Tourists = c.execute(f"select dbo.getWeeklyTourists('{region}')")
+    Volunteers = c.execute(f"select dbo.getWeeklyVolunteers('{region}')")
+    TotalPBs = c.execute(f"select dbo.getWeeklyPBs('{region}')")
+    TotalRunners = c.execute(f"select dbo.getWeeklyTotalRunners('{region}')")
+    TotalRunnersLastWeek = c.execute(f"select dbo.getWeeklyTotalRunnersLastWeek('{region}')")
+    
+    p = e.SubElement(root, 'p')
+    p.text = f"We had {TotalRunners:,.0f} ({direction(TotalRunners - TotalRunnersLastWeek)} by {abs(TotalRunners - TotalRunnersLastWeek):,.0f} or {abs(TotalRunnersLastWeek - TotalRunners) / TotalRunners:.2%}), with {TotalPBs:,.0f} PB's ({TotalPBs / TotalRunners:.2%}), {Tourists:,.0f} tourists visiting new events for the first time, and {FirstTimers:,.0f} first timers, supported by {Volunteers} volunteers."
+
     data = c.execute(f"select top(5) ParkrunName, ThisWeek, RunnersChange from qryWeeklyParkrunEventSize where Region='{region}' order by ThisWeek desc")
     p = e.SubElement(root, 'p')
     p.text = "The largest events were "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['RunnersChange'])}{abs(row['RunnersChange'])}){concat(row,data)}"
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']}, {direction(row['RunnersChange'])} {abs(row['RunnersChange'])}){concat(row,data)}"
     
     data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' order by LastWeekP desc")
     p = e.SubElement(root, 'p')
     p.text = "The largest increase by percentage was "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']},{direction(row['LastWeekP'])}{abs(row['LastWeekP']):.0f}%){concat(row,data)}"
+        p.text += f"{row['ParkrunName']} ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
     
     data = c.execute(f"select top(5) ParkrunName, PBs from getTop5PBs('{region}') order by PBs desc")
     p = e.SubElement(root, 'p')
