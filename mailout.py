@@ -1,6 +1,7 @@
 import logging, logging.config, multiprocessing, lxml.html, gMail, math
 
-import xml.etree.ElementTree as e
+#import xml.etree.ElementTree as e
+import lxml.etree as e
 from mplogger import *
 from dbconnection import Connection
 from datetime import date
@@ -8,10 +9,14 @@ from datetime import date
 fstr = lambda s: '' if s is None else str(s)
 
 direction = lambda s: 'down' if s < 0 else ('steady at' if s == 0 else 'up')
-concat = lambda r, d: ' and ' if r == d[-2] else ('.' if r == d[-1] else ', ')
+concat = lambda r, d: ' and ' if r == d[-2] else ('' if r == d[-1] else ', ')
 ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(math.floor(n/10)%10!=1)*(n%10<4)*n%10::4])
 formattime = lambda s: s.strftime('%M:%S') if s.hour == 0 else s.strftime('%H:%M:%S')
-guntimedelta = lambda o, n: datetime.combine(date.min, o) - datetime.combine(date.min, n) 
+guntimedelta = lambda o, n: datetime.combine(date.min, o) - datetime.combine(date.min, n)
+genderPosessive = lambda s: 'his' if s == 'M' else 'her'
+genderObjective = lambda s: 'him' if s == 'M' else 'her'
+daySalutation = lambda: 'morning' if datetime.now().hour < 13 else 'afternoon'
+
  
 loggingQueue = multiprocessing.Queue()
 config = sender_config
@@ -23,26 +28,20 @@ StyleSheet = """
                     background-color: White
                 }
                 table{
+                    border-collapse:collapse;
                     border-spacing : 0;
                     padding : 20px;
                     cellspacing : 4;
                     cellpadding : 0;
-                    border : 1px solid black;
                 }
                 .milestone {
                     background-color: Yellow
                 }
                 .altrow1 {
-                    background-color: GhostWhite
+                    background-color: #EEEEEE
                 }
                 .altrow2 {
-                    background-color: Gainsboro
-                }
-                .lastrow {
-                    border-bottom : 1px solid white;
-                }
-                .firstcol {
-                    border-left : 1px solid white;
+                    background-color: #DDDDDD
                 }
                 .text {
                     text-align : left;
@@ -56,34 +55,36 @@ StyleSheet = """
                 .newevent {
                     color : ForestGreen;
                     font-weight : bold;
+                    font-style : italic;
                 }
                 .volunteer {
                     color : BlueViolet;
                     font-weight : bold;
+                    font-style : italic;
                 }
                 .arrowUp {
                     color : Green;
                     font-weight : bold;
                     font-size : 15px;
+                    text-align: center;
                 }
                 .arrowDown {
                     color : Red;
                     font-weight : bold;
                     font-size : 15px;
+                    text-align: center;
                 }
                 .arrowRight {
                     color : Blue;
                     font-weight : bold;
                     font-size : 15px;
                 }
-                tr, td {
-                    font-size : 14px;
-                    vertical-align : middle;
-                    padding : 5px;
-                    border-top: 1px solid white;
-                    border-right: 1px solid white;
-                    border-bottom : 0;
-                    border-left : 0;
+                a.parkrunname {
+                    font-weight : bold;
+                    color : black;
+                }
+                a.athlete {
+                    color : black;
                 }
                 th {
                     font-size : 16px';
@@ -94,7 +95,14 @@ StyleSheet = """
                     padding-right : 12px;
                 }
                 h3 {
-                    padding : 20px;
+                    padding-left : 80px;
+                    font-size : 20px;
+                    font-style : italic;
+                    color : Blue;
+                }
+                .section {
+                    margin-top : 50px;
+                    margin-bottom : 10px;
                 }
                 .parkrunname {
                     font-weight: bold;
@@ -119,31 +127,105 @@ StyleSheet = """
                     font-weight: bold;
                     color: Blue;
                 }
-                
+                tr, td {
+                    font-size : 14px;
+                    vertical-align : middle;
+                    padding : 5px;
+                }
+                colgroup {
+                    border-left: 1px solid black;
+                    border-right: 1px solid black;
+                }
+                .lastrow {
+                    border-bottom : 1px solid black;
+                }
+                .firstrow {
+                    border-top : 1px solid black;
+                }
+                .name {
+                    font-size: 3em;
+                    font-style: italic;
+                    color: red;
+                    background-color: #EEE;
+                    border-top: thin solid;
+                    border-top-color: red;
+                    padding: 0px 30px;
+                    margin-top: 15px;
+                }
+                .business {
+                    font-size: 1.75em;
+                    font-style: italic;
+                    color: black;
+                    padding: 0px 60px;
+                }
+                .title {
+                    float: left;
+                    font-size: 1.5em;
+                    color: blue;
+                    margin-left: 60px;
+                }
+                .details {
+                    float: right;
+                }
+                .details p{
+                    color: #888;
+                    margin: 0px 15px;
+                }
+                .footer {
+                    border-bottom: thin solid;
+                    border-bottom-color: red;
+                    height: 15px;
+                    background-color: #EEE;
+                    margin-top: 15px;
+                    margin-bottom: 15px;
+                }
+                .container {
+                    width: 450px;
+                }
+                .container:before,
+                .container:after {
+                    content: " ";
+                    display: table;
+                }
+                .container:after {
+                    clear: both;
+                }
             """
-
 
 def buildDetailParkrunReport(parkrun, node):
     c = Connection(config)
     
-    data = c.execute(f"select * from getParkrunReportDetail('{parkrun}') order by [Total Runs] desc")
+    data = c.execute(f"select * from getParkrunReportDetail('{parkrun}') order by EventCount desc")
+
+    colgroups = {
+        'Barcode<br>Name<br>Club<br>Last Run' : ['AthleteID', 'Name', 'ClubName', 'LastEventDate'],
+        'Name'                                : ['Name'],
+        'Total<br>Home'                       : ['EventCount', 'RunCount'],
+        'Gender<br>Age Cat<br>Age Grp'        : ['Gender', 'AgeCategory', 'AgeGroup']
+        }
+    
     t = e.SubElement(node,'table')
-    t.attrib['class'] = 'sortable'
-    thead = e.SubElement(t,'thead')
-    tr = e.SubElement(thead,'tr')
-    for i in list(data[0].keys()):
-        td = e.SubElement(tr,'th')
-        td.text = i
-        td.attrib['class'] = 'header'
+    for i in colgroups:
+        col = e.SubElement(t, 'colgroup', {'span': f"{len(colgroups[i])}"})
+    tr1 = e.SubElement(t,'tr', {'class' : 'firstrow'})
+    
+    for i in colgroups:
+        h = str(i).split('<br>')
+        td = e.SubElement(tr1,'th', {'scope' : 'colgroup'})
+        td.text = h[0]
+        for i in range(1,len(h)):
+            td = e.SubElement(tr1,'th', {'scope': 'col'})
+            td.text = str(h[i])
+    
     
     rowcount = 0
     for row in data:
         cls = ''
-        if 47 <= row['Total Runs'] <= 49 or \
-           97 <= row['Total Runs'] <= 99 or \
-           247 <= row['Total Runs'] <= 249 or \
-           497 <= row['Total Runs'] <= 499 or \
-           97 <= row['Runs at Home'] <= 99:
+        if 47 <= row['EventCount'] <= 49 or \
+           97 <= row['EventCount'] <= 99 or \
+           247 <= row['EventCount'] <= 249 or \
+           497 <= row['EventCount'] <= 499 or \
+           97 <= row['RunCount'] <= 99:
             cls = 'milestone'
         else:
             if rowcount == 0:
@@ -156,37 +238,49 @@ def buildDetailParkrunReport(parkrun, node):
             rowcount = 0
         else:
             cls = ''
-        for k, v in row.items():
-            cls = ''
-            td = e.SubElement(tr, 'td')
-            if type(v).__name__ == 'int':
-                cls = 'number'
-            else:
-                cls='text'
-            if k in ['Gender', 'Age Group']:
-                cls = 'centered'
-            if len(fstr(v)) > 0:
-                td.text = fstr(v)
-            if k == 'Barcode':
-                cls = 'firstcol text' 
-            if row == data[-1]:
-                cls += ' lastrow'
-            if len(cls) > 0:
-                td.attrib['class'] = cls
+        for k in colgroups:
+            for i in colgroups[k]:
+                cls = ''
+                td = e.SubElement(tr, 'td')
+                if type(row[i]).__name__ == 'int':
+                    cls = 'number'
+                else:
+                    cls='text'
+                if i in ['Gender', 'AgeGroup']:
+                    cls = 'centered'
+                if len(fstr(row[i])) > 0:
+                    td.text = fstr(row[i])
+                if k == 'AthleteID':
+                    cls = 'text' 
+                if row == data[-1]:
+                    cls += ' lastrow'
+                if len(cls) > 0:
+                    td.attrib['class'] = cls
     #return #root #lxml.html.tostring()
 
 def buildSummaryParkrunReport(parkrun, node):
     c = Connection(config)
-    data = c.execute(f"select * from getParkrunReportSummary('{parkrun}') order by [Total Runs] desc")
+    data = c.execute(f"select * from getParkrunReportSummary('{parkrun}') order by EventCount desc")
+    
+    colgroups = {
+        'Barcode<br>Name<br>Club<br>Last Run' : ['AthleteID', 'Name', 'ClubName', 'LastEventDate'],
+        'Name'                                : ['Name'],
+        'Total<br>Home'                       : ['EventCount', 'RunCount'],
+        'Gender<br>Age Cat<br>Age Grp'        : ['Gender', 'AgeCategory', 'AgeGroup']
+        }
     
     t = e.SubElement(node,'table')
-    t.attrib['class'] = 'sortable'
-    thead = e.SubElement(t,'thead')
-    tr = e.SubElement(thead,'tr')
-    for i in list(data[0].keys()):
-        td = e.SubElement(tr,'th')
-        td.text = i
-        td.attrib['class'] = 'header'
+    for i in colgroups:
+        col = e.SubElement(t, 'colgroup', {'span': f"{len(colgroups[i])}"})
+    tr1 = e.SubElement(t,'tr', {'class' : 'firstrow'})
+    
+    for i in colgroups:
+        h = str(i).split('<br>')
+        td = e.SubElement(tr1,'th', {'scope' : 'colgroup'})
+        td.text = h[0]
+        for i in range(1,len(h)):
+            td = e.SubElement(tr1,'th', {'scope': 'col'})
+            td.text = str(h[i])
     
     rowcount = 0
     for row in data:
@@ -200,71 +294,96 @@ def buildSummaryParkrunReport(parkrun, node):
             rowcount = 0
         else:
             cls = ''
-        for k, v in row.items():
-            cls = ''
-            td = e.SubElement(tr, 'td')
-            if type(v).__name__ == 'int':
-                cls = 'number'
-            else:
-                cls='text'
-            if k in ['Gender', 'Age Group']:
-                cls = 'centered'
-            if len(fstr(v)) > 0:
-                td.text = fstr(v)
-            if k == 'Barcode':
-                cls = 'firstcol text' 
-            if row == data[-1]:
-                cls += ' lastrow'
-            if len(cls) > 0:
-                td.attrib['class'] = cls
+        for k in colgroups:
+            for i in colgroups[k]:
+                cls = ''
+                td = e.SubElement(tr, 'td')
+                if type(row[i]).__name__ == 'int':
+                    cls = 'number'
+                else:
+                    cls='text'
+                if i in ['Gender', 'AgeGroup']:
+                    cls = 'centered'
+                if len(fstr(row[i])) > 0:
+                    td.text = fstr(row[i])
+                if i == 'AthleteID':
+                    cls = 'text' 
+                if row == data[-1]:
+                    cls += ' lastrow'
+                if len(cls) > 0:
+                    td.attrib['class'] = cls
     #return root #lxml.html.tostring()
 
 def buildWeeklyParkrunReport():
     region = 'Victoria'
     root = e.Element('html', version = '5.0')
+    head = e.SubElement(root, 'head')
+    
     body = e.SubElement(root, 'body')
-    p = e.SubElement(body, 'h3')
-    p.text = 'Good morning fellow parkrunners!'
+    p = e.SubElement(body, 'h4')
+    p.text = f'Good {daySalutation()} fellow parkrunners!'
     p = e.SubElement(body, 'p')
     p.text = f"Welcome to the weekly parkrun report for {date.today().strftime('%A')}, the {ordinal(date.today().day)} of {date.today().strftime('%B, %Y')}." 
     p = e.SubElement(body, 'p')
-    br = e.SubElement(p, 'br')
     c = Connection(config)
     
+    
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'h3')
+    p.text = f'Weekend in brief'
     data = c.execute(f"select ParkrunName from getParkrunCancellations('{region}') order by ParkrunName")
-    p = e.SubElement(body, 'p')
-    p.text = "As of writing "
+    p = e.SubElement(sec, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = "As of writing "
+    s = e.SubElement(p, 'span')
     if len(data) == 0:
-        p.text += "there were no cancellations"
+        s.text = "there were no "
     elif len(data) == 1:
-        p.text = f"{data[0]['ParkrunName']} was the only cancellation"
+        s.text = f"{data[0]['ParkrunName']} was the only "
+        a = e.SubElement(p, 'a', {'href' : 'https://www.parkrun.com.au/cancellations/', 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = 'calncellation'
+    else:
+        s = e.SubElement(p, 'span')
+        s.text = ''
+        for row in data:
+            s.text += f"{row['ParkrunName']}{concat(row,data)}"
+        s.text = s.text[:-1] +  " were the only "
+        a = e.SubElement(p, 'a', {'href' : 'https://www.parkrun.com.au/cancellations/', 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = 'cancellations'
+
+    data = c.execute(f"select ParkrunName, URL from getParkrunNoResults('{region}') order by ParkrunName")
+    s = e.SubElement(p, 'span')
+    s.text = ", with "
+    if len(data) == 0:
+        s.text += "all other events posting results"
+    elif len(data) == 1:
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{data[0]['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = data[0]['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = " the only event yet to post results"
     else:
         for row in data:
-            p.text += f"{row['ParkrunName']}{concat(row,data)}"
-        p.text = p.text[:-1] +  " were the only cancellations"
+            a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            a.text = row['ParkrunName']
+            s = e.SubElement(p, 'span')
+            s.text = f"{concat(row,data)}"
+        s.text =  " yet to post results"
 
-    data = c.execute(f"select ParkrunName from getParkrunNoResults('{region}') order by ParkrunName")
-    p.text += ", with "
+    data = c.execute(f"select ParkrunName, URL from getParkrunNoVolunteers('{region}') order by ParkrunName")
+    s = e.SubElement(p, 'span')
+    s.text = " and "
     if len(data) == 0:
-        p.text += "all other events posting results"
+        s.text += "all volunteer information recorded."
     elif len(data) == 1:
-        p.text = f"{data[0]['ParkrunName']} the only event yet to post results"
-    else:
-        for row in data:
-            p.text += f"{row['ParkrunName']}{concat(row,data)}"
-        p.text = p.text[:-1] +  " yet to post results"
-
-    data = c.execute(f"select ParkrunName from getParkrunNoVolunteers('{region}') order by ParkrunName")
-    p.text += " and "
-    if len(data) == 0:
-        p.text += "all volunteer information recorded."
-    elif len(data) == 1:
-        p.text = f"{data[0]['ParkrunName']} the only event yet to post volunteer information."
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{data[0]['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = data[0]['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = " the only event yet to post volunteer information."
     else:
         for row in data:
             p.text += f"{row['ParkrunName']}{concat(row,data)}"
         p.text = p.text[:-1] +  " yet to post volunteer information."
-
+    
     FirstTimers = c.execute(f"select dbo.getWeeklyFirstTimers('{region}')")
     Tourists = c.execute(f"select dbo.getWeeklyTourists('{region}')")
     Volunteers = c.execute(f"select dbo.getWeeklyVolunteers('{region}')")
@@ -272,109 +391,169 @@ def buildWeeklyParkrunReport():
     TotalRunners = c.execute(f"select dbo.getWeeklyTotalRunners('{region}')")
     TotalRunnersLastWeek = c.execute(f"select dbo.getWeeklyTotalRunnersLastWeek('{region}')")
     
-    p = e.SubElement(body, 'p')
-    p.text = f"We had {TotalRunners:,.0f} ({direction(TotalRunners - TotalRunnersLastWeek)} by {abs(TotalRunners - TotalRunnersLastWeek):,.0f} or {abs(TotalRunnersLastWeek - TotalRunners) / TotalRunners:.2%}), with {TotalPBs:,.0f} PB's ({TotalPBs / TotalRunners:.2%}), {Tourists:,.0f} tourists visiting new events for the first time, and {FirstTimers:,.0f} first timers, supported by {Volunteers} volunteers."
-
-    data = c.execute(f"select top(5) ParkrunName, ThisWeek, RunnersChange from qryWeeklyParkrunEventSize where Region='{region}' order by ThisWeek desc")
-    p = e.SubElement(body, 'p')
-    p.text = "The largest events were "
-    for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']}, {direction(row['RunnersChange'])} {abs(row['RunnersChange'])}){concat(row,data)}"
+    p = e.SubElement(sec, 'p')
+    p.text = f"We had {TotalRunners:,.0f} runners ({direction(TotalRunners - TotalRunnersLastWeek)} by {abs(TotalRunners - TotalRunnersLastWeek):,.0f} or {abs(TotalRunnersLastWeek - TotalRunners) / TotalRunners:.2%}), with {TotalPBs:,.0f} PB's ({TotalPBs / TotalRunners:.2%}), {Tourists:,.0f} tourists visiting new events for the first time, and {FirstTimers:,.0f} first timers, supported by {Volunteers} volunteers."
     
-    data = c.execute(f"select top(5) ParkrunName, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' order by LastWeekP desc")
-    p = e.SubElement(body, 'p')
-    p.text = "The largest increase by percentage was "
+    data = c.execute(f"select top(5) ParkrunName, URL, ThisWeek, RunnersChange from qryWeeklyParkrunEventSize where Region='{region}' order by ThisWeek desc")
+    p = e.SubElement(sec, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = "The largest events were "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = row['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = f" ({row['ThisWeek']}, {direction(row['RunnersChange'])} {abs(row['RunnersChange'])}){concat(row,data)}"
+    s.text += '.'
     
-    data = c.execute(f"select top(5) ParkrunName, PBs from getTop5PBs('{region}') order by PBs desc")
-    p = e.SubElement(body, 'p')
-    p.text = "The most PBs were at "
+    data = c.execute(f"select top(5) ParkrunName, URL, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' order by LastWeekP desc")
+    p = e.SubElement(sec, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = "The largest increase by percentage was "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['PBs']}){concat(row,data)}"
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = row['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = f" ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
+    s.text += '.'
     
-    data = c.execute(f"select top(5) ParkrunName, PBs, Percentage from getTop5PBsByPercent('{region}') order by Percentage desc")
-    p = e.SubElement(body, 'p')
-    p.text = "The most PBs by percentage of field was "
+    data = c.execute(f"select ParkrunName, URL, PBs from getTop5PBs('{region}') order by PBs desc")
+    p = e.SubElement(sec, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = "The most PBs were at "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['PBs']} or {row['Percentage']:.0f}%){concat(row,data)}"
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = row['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = f" ({row['PBs']}){concat(row,data)}"
+    s.text += '.'
     
-    data = c.execute(f"select top(5) ParkrunName, FirstTimers, Percentage from getTop5FirstTimers('{region}') order by FirstTimers desc")
-    p = e.SubElement(body, 'p')
-    p.text = "The most first timers were at "
+    data = c.execute(f"select ParkrunName, URL, PBs, Percentage from getTop5PBsByPercent('{region}') order by Percentage desc")
+    p = e.SubElement(sec, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = "The most PBs by percentage of field was "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['FirstTimers']}){concat(row,data)}"
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = row['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = f" ({row['PBs']} or {row['Percentage']:.0f}%){concat(row,data)}"
+    s.text += '.'
     
-    data = c.execute(f"select top(5) ParkrunName, FirstTimers, Percentage from getTop5FirstTimersByPercent('{region}') order by Percentage desc")
-    p = e.SubElement(body, 'p')
-    p.text = "The most first timers by percentage of field was at "
+    data = c.execute(f"select ParkrunName, URL, FirstTimers, Percentage from getTop5FirstTimers('{region}') order by FirstTimers desc")
+    p = e.SubElement(sec, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = "The most first timers were at "
     for row in data:
-        p.text += f"{row['ParkrunName']} ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = row['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = f" ({row['FirstTimers']}){concat(row,data)}"
+    s.text += '.'
     
-    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestFemale as q where q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
-    p = e.SubElement(body, 'p')
+    data = c.execute(f"select ParkrunName, URL, FirstTimers, Percentage from getTop5FirstTimersByPercent('{region}') order by Percentage desc")
+    p = e.SubElement(sec, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = "The most first timers by percentage of field was at "
+    for row in data:
+        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        a.text = row['ParkrunName']
+        s = e.SubElement(p, 'span')
+        s.text = f" ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
+    s.text += '.'
+    
+    
+    
+    
+    
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'h3')
+    p.text = f'The fastest among us'
+    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'F' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
+    d = e.SubElement(sec, 'div')
+    p = e.SubElement(d, 'p')
     p.text = f"The {len(data)} fastest females in {region} by age category, in pace order, were:"
-    l = e.SubElement(p,'ol')
+    l = e.SubElement(d,'ol')
     for row in data:
         li = e.SubElement(l,'li')
-        li.text = f"{row['Athlete']} ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
+        s = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        s.text = f"{row['Athlete']}"
+        s = e.SubElement(li, 'span')
+        s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
         if row['Comment'] not in [None, 'PB']:
             if row['Comment'] == 'New PB!':
-                li.text += ' setting herself a new PB'
+                s.text += f" setting herself a new PB"
             else:
-                li.text += ' for the first time'
-        li.text += '.'
+                s.text += ' for the first time'
+        s.text += '.'
         
-    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestMale as q where q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
-    p = e.SubElement(body, 'p')
+    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'M' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
+    d = e.SubElement(sec, 'div')
+    p = e.SubElement(d, 'p')
     p.text = f"The {len(data)} fastest males in {region} by age category, in pace order, were:"
-    l = e.SubElement(p,'ol')
+    l = e.SubElement(d,'ol')
     for row in data:
         li = e.SubElement(l,'li')
-        li.text = f"{row['Athlete']} ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
+        s = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+        s.text = f"{row['Athlete']}"
+        s = e.SubElement(li, 'span')
+        s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
         if row['Comment'] not in [None, 'PB']:
             if row['Comment'] == 'New PB!':
-                li.text += ' setting himself a new PB'
+                s.text += f" setting himself a new PB"
             else:
-                li.text += ' for the first time'
-        li.text += '.'
+                s.text += ' for the first time'
+        s.text += '.'
     
     
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'h3')
+    p.text = f'Reaching Milestones'
     milestones = [500, 250, 100, 50]
     
     for m in milestones:
         data = c.execute(f"select * from getWeeklyMilestones('{region}', {m}) order by ParkrunName, LastName")
         if len(data) > 0:
-            p = e.SubElement(body, 'p')
+            d = e.SubElement(sec, 'div')
+            p = e.SubElement(d, 'p')
             if len(data) > 1:
                 p.text = f"The following {len(data)} athletes join the {m} club this week:"
             else:
                 p.text = f"Just one athlete joined the {m} club this week:"
-            l = e.SubElement(p, 'ul')
+            l = e.SubElement(d, 'ul')
             currentParkrun = data[0]['ParkrunName']
             li = e.SubElement(l, 'li')
+            s = e.SubElement(li, 'a', {'class' : 'parkrunname', 'href' : f"https://www.parkrun.com.au/{data[0]['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+            s.text = currentParkrun
             s = e.SubElement(li, 'span')
-            s.attrib['class'] = 'parkrunname'
-            s.text = currentParkrun + ': '
-            n = e.SubElement(li, 'span')
-            n.text = ''
+            s.text = ': '
             for row in data:
                 if row['ParkrunName'] != currentParkrun:
-                    n.text = n.text[:-2]
+                    s.text = ''
                     currentParkrun = row['ParkrunName']
                     li = e.SubElement(l, 'li')
+                    s = e.SubElement(li, 'a', {'class' : 'parkrunname', 'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                    s.text = currentParkrun
                     s = e.SubElement(li, 'span')
-                    s.attrib['class'] = 'parkrunname'
-                    s.text = currentParkrun + ': '
-                    n = e.SubElement(li, 'span')
-                    n.text = ''
-                n.text += f"{row['FirstName']} {row['LastName']}, "
-            n.text = n.text[:-2]
+                    s.text = ': '
+                    n = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                    n.text = f"{row['FirstName']} {row['LastName']}"
+                    s = e.SubElement(li, 'span')
+                    s.text = ', '
+                else:
+                    n = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                    n.text = f"{row['FirstName']} {row['LastName']}"
+                    s = e.SubElement(li, 'span')
+                    s.text = ', '
+            s.text = ''
                 
+
     
     
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'h3')
+    p.text = f'Record Setters'
     data = c.execute(f"select * from qryParkrunRecordsBrokenThisWeek where Region = '{region}' order by ParkrunName")    
-    p = e.SubElement(body, 'p')
+    d = e.SubElement(sec, 'div')
+    p = e.SubElement(d, 'p')
     if len(data) == 0:
         p.text = 'There were no course records broken this week.'
     else:
@@ -382,38 +561,40 @@ def buildWeeklyParkrunReport():
             p.text = f'There was just one course record broken this week:'
         else:
             p.text = f'There were {len(data)} course records broken this week:'
-        l = e.SubElement(p, 'ul')
+        l = e.SubElement(d, 'ul')
         for row in data:
+            ownrecord = False
             li = e.SubElement(l, 'li')
+            s = e.SubElement(li, 'a', {'class' : 'parkrunname', 'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+            s.text = row['ParkrunName']
             s = e.SubElement(li, 'span')
-            s.attrib['class'] = 'parkrunname'
-            s.text = row['ParkrunName'] + ': '
-            n = e.SubElement(li, 'span')
+            s.text = ': '
+            n = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
             n.text = f"{row['FirstName']} {row['LastName']} "
-            rd = guntimedelta(row['PreviousRecord'], row['GunTime']).seconds 
+            rd = guntimedelta(row['PreviousRecord'], row['GunTime']).seconds
+            s =  e.SubElement(li, 'span')
             if rd > 60:
-                margin = 'smashed'
+                s.text = 'smashed'
             elif 20 < rd <= 60:
-                margin = 'broke'
+                s.text = 'broke'
             else:
-                margin = 'took'
+                s.text = 'took'
             if row['FirstName'] == row['PreviousRecordHolderFirstName'] and row['LastName'] == row['PreviousRecordHolderLastName']:
-                if row['Gender'] == 'F':
-                    taken = f'her own record'
-                else:
-                    taken = f'his own record'
+                s.text += f" {genderPosessive(row['Gender'])} own record"
+                ownrecord = True
             else:
-                taken = f"{row['PreviousRecordHolderFirstName']} {row['PreviousRecordHolderLastName']}'s record"
-            n.text += f"{margin} {taken} by {guntimedelta(row['PreviousRecord'], row['GunTime']).seconds} seconds"
-            if row['Comment'] == 'New PB!' and 'own record' not in taken:
-                if row['Gender'] == 'F':
-                    n.text += f', setting herself a new PB'
-                else:
-                    n.text += f', setting himself a new PB'
-            n.text += '.'
+                n = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['PreviousRecordHolderAthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                n.text = f"{row['PreviousRecordHolderFirstName']} {row['PreviousRecordHolderLastName']}"
+                s =  e.SubElement(li, 'span')
+                s.text = f"'s record "
+            s.text += f" by {guntimedelta(row['PreviousRecord'], row['GunTime']).seconds} seconds"
+            if row['Comment'] == 'New PB!' and not ownrecord:
+                s.text += f", setting {genderObjective(row['Gender'])}self a new PB,"
+            s.text += f" running {formattime(row['GunTime'])}."
     
     data = c.execute(f"select * from qryEventRecordsBrokenThisWeek WHERE Region = '{region}'")
-    p = e.SubElement(body, 'p')
+    d = e.SubElement(sec, 'div')
+    p = e.SubElement(d, 'p')
     if len(data) == 0:
         p.text = 'There were no attendance records broken this week.'
     else:
@@ -421,7 +602,7 @@ def buildWeeklyParkrunReport():
             p.text = f'There was just one attendance record broken this week:'
         else:
             p.text = f'There were {len(data)} attendance records broken this week:'
-        l = e.SubElement(p, 'ul')
+        l = e.SubElement(d, 'ul')
         for row in data:
             li = e.SubElement(l, 'li')
             s = e.SubElement(li, 'span')
@@ -441,58 +622,60 @@ def buildWeeklyParkrunReport():
                 if row['PreviousRecordEvent'] == 1:
                     n.text += f"on their launch "
                 n.text += f"back on the {ordinal(row['PreviousRecordDate'].day)} of {row['PreviousRecordDate'].strftime('%B, %Y')}"
-                
-            
-        
-    """
-    s = e.SubElement(body,'style')
-    s.text = StyleSheet
-    x = e.tostring(root).decode('utf-8').replace('&amp;','&')
-    with open('output.html','w') as f:
-        f.write(x)
-    return
-    """
     
+    
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'h3')
+    p.text = f'Kodos to the vollies'
+    vollyP = e.SubElement(sec, 'p')
+    
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'h3')
+    p.text = f'Statesmanship Top 100'
     data = c.execute(f"SELECT * FROM getStatesmanReport(100, '{region}') ORDER BY Rank, TQTY DESC")
+    #data = c.execute(f"SELECT * FROM temptable ORDER BY Rank, TQTY DESC")
+    
+    vollies = {}
     
     colgroups = {
-        'Rank'                  : ['Rank', 'RankArrow', 'AbsRankChange'],
-        'Weeks<br>Held'         : ['Weeks'],
-        'Athlete'               : ['AthleteName'],
-        'Parkrun'               : ['LastRunParkrun'],
-        'Events<br>Local/Total' : ['Events', 'DifferentEvents'],
-        'Total<br>Runs'         : ['EventCount'],
-        'Tourist<br>Quotient'   : ['TQ', 'TQTY'],
-        'This Year<br>Run/New'  : ['TYEventsDone', 'TYNewEvents'],
-        'Last Year<br>Run/New'  : ['LYEventsDone', 'LYNewEvents'],
-        'P<br>Index'            : ['pIndex'],
-        'Wilson<br>Index'       : ['wIndex', 'WIndexArrow', 'wIndexChange']
+        'Rank'                                               : ['Rank', 'RankArrow', 'AbsRankChange'],
+        'Weeks<br>Held'                                      : ['Weeks'],
+        'Athlete'                                            : ['AthleteName'],
+        'Parkrun'                                            : ['LastRunParkrun'],
+        'Events<br>Local/Total'                              : ['Events', 'DifferentEvents'],
+        'Total<br>Runs'                                      : ['EventCount'],
+        f'Tourist Quotient<br>Overall/{datetime.now().year}' : ['TQ', 'TQTY'],
+        f'{datetime.now().year}<br>Run/New'                  : ['TYEventsDone', 'TYNewEvents'],
+        f'{datetime.now().year - 1}<br>Run/New'              : ['LYEventsDone', 'LYNewEvents'],
+        'P<br>Index'                                         : ['pIndex'],
+        'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange']
         }
     
-    t = e.SubElement(body,'table')
-    thead = e.SubElement(t,'thead')
-    tr1 = e.SubElement(thead,'tr')
-    tr2 = e.SubElement(thead,'tr')
+    t = e.SubElement(sec,'table')
+    for i in colgroups:
+        c = e.SubElement(t, 'colgroup', {'span': f"{len(colgroups[i])}"})
+    tr1 = e.SubElement(t,'tr', {'class' : 'firstrow'})
+    tr2 = e.SubElement(t,'tr')
+    msgs = e.SubElement(sec, 'div')
     
     for i in colgroups:
         h = str(i).split('<br>')
-        td = e.SubElement(tr1,'th')
+        td = e.SubElement(tr1,'th', {'colspan': f"{len(colgroups[i])}", 'scope' : 'colgroup'})
         td.text = h[0]
-        td.attrib['colspan'] = str(len(colgroups[i]))
-        
         if len(h) > 1:
             if len(colgroups[i]) > len(h[1].split('/')):
-                td = e.SubElement(tr2,'th')
-                td.attrib['colspan'] = str(len(colgroups[i]))
+                td = e.SubElement(tr2,'th', {'scope': 'col', 'colspan': f"{len(colgroups[i])}"})
                 td.text = str(h[1])
             else:
                 for x in h[1].split('/'):
-                    td = e.SubElement(tr2,'th')
+                    td = e.SubElement(tr2,'th', {'scope': 'col'})
                     td.text = str(x)
         else:
             td = e.SubElement(tr2,'th')
             td.attrib['colspan'] = str(len(colgroups[i]))
-    
+            td.attrib['scope'] = 'col'
+        
+        
     rowcount = 0
     for row in data:
         if rowcount == 0:
@@ -510,7 +693,7 @@ def buildWeeklyParkrunReport():
                     cls = 'number'
                 else:
                     cls = 'text'
-                if j in ['Weeks']:
+                if j in ['Weeks', 'pIndex']:
                     cls = 'centered'
                 if j == 'Rank':
                     cls += ' firstcol' 
@@ -534,48 +717,141 @@ def buildWeeklyParkrunReport():
                     s.attrib['class'] = scls
                     s.text = arr
                     row[j] = s
-                if i == 'Parkrun':
-                    if row['LastRunParkrunThisWeek'] > 0:
-                        s = e.SubElement(e.SubElement(td,'p'), 'span')
-                        s.text = fstr(row['LastRunParkrun'])
-                        if row['EventChange'] > 0:
-                            s.attrib['class'] = 'newevent'
-                    if row['VolunteerThisWeek'] is not None:
-                        if row['VolunteerThisWeek'] > 0:
-                            s = e.SubElement(td, 'span')
-                            s.text = f"({fstr(row['LastVolParkrun'])})"
-                            s.attrib['class'] = 'volunteer'
-                    row[j] = None
                 if j == 'DifferentEvents':
-                    if row[j] in [49, 99, 199]:
+                    if row[j] in [49, 99]:
                         cls += ' approachingmilestone'
+                        if row[j] == 99:
+                            p = e.SubElement(msgs, 'p')
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = row['FirstName']
+                            s = e.SubElement(p, 'span')
+                            s.text = 'is set set to join the Cowell club next week.'
+                if j == 'DifferentEvents':
+                    if row[j] in [50, 100]:
+                        cls += ' milestone50'
+                        if row[j] == 100:
+                            p = e.SubElement(msgs, 'p')
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = row['FirstName']
+                            s = e.SubElement(p, 'span')
+                            s.text = f" achieved {genderPosessive(row['Gender'])} Cowell at "
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = row['tmpParkrun']
+                            s = e.SubElement(p, 'span')
+                            s.text = "."
+                            
                 if j == 'EventCount':
                     if row[j] in [49, 99, 249, 499]:
                         cls += ' approachingmilestone'
-                    if row[j] == 50:
-                        cls += ' milestone50'
-                    if row[j] == 100:
-                        cls += ' milestone100'
-                    if row[j] == 250:
-                        cls += ' milestone250'
-                    if row[j] == 500:
-                        cls += ' milestone500'
+                        p = e.SubElement(msgs, 'p')
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a.text = row['FirstName']
+                        s = e.SubElement(p, 'span')
+                        s.text = f" is set to run {genderPosessive(row['Gender'])} {row['EventCount'] + 1}th parkrun next week."
+                    if row[j] in [50, 100, 250, 500]:
+                        cls += f' milestone{row[j]}'
+                        p = e.SubElement(msgs, 'p')
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a.text = row['FirstName']
+                        s = e.SubElement(p, 'span')
+                        s.text = f" ran {genderPosessive(row['Gender'])} {row['EventCount'] + 1}th parkrun at "
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a.text = row['tmpParkrun']
+                        s = e.SubElement(p, 'span')
+                        s.text = "."
                 if j == 'pIndex':
                     if row['pIndexChange'] > 0:
-                        cls += ' 50milestone'
-                if j == 'wIndex':
+                        cls += ' milestone50'
+                        p = e.SubElement(msgs, 'p')
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a.text = row['FirstName']
+                        s = e.SubElement(p, 'span')
+                        s.text = f" ups {genderPosessive(row['Gender'])} p index to {row['pIndex']} at "
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a.text = row['tmpParkrun']
+                        s = e.SubElement(p, 'span')
+                        s.text = "."
+                if j in ['wIndex', 'wIndexChange']:
                     if row['wIndexChange'] > 0:
-                        cls += ' 250milestone'
-                
-                        
+                        cls += ' milestone50'
+                        if j == 'wIndex':
+                            p = e.SubElement(msgs, 'p')
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = row['FirstName']
+                            s = e.SubElement(p, 'span')
+                            s.text = f" ups {genderPosessive(row['Gender'])} Wilson index by {row['wIndexChange']} to {row['wIndex']} at "
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = row['tmpParkrun']
+                            s = e.SubElement(p, 'span')
+                            s.text = "."
+                if i == 'Parkrun':
+                    if row['LastRunParkrunThisWeek'] > 0:
+                        s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        s.text = fstr(row['LastRunParkrun'])
+                        if row['EventChange'] > 0:
+                            s.attrib['class'] = 'newevent'
+                        else:
+                            s.attrib['class'] = 'athlete'
+                    if row['VolunteerThisWeek'] is not None:
+                        if row['VolunteerThisWeek'] > 0:
+                            if row['LastRunParkrunThisWeek'] > 0:
+                                b = e.SubElement(td, 'br')
+                            if row['LastVolParkrun'] not in vollies:
+                                vollies[row['LastVolParkrun']] = {'URL' : row['LastVolParkrunURL'], 'names' : []}
+                            vollies[row['LastVolParkrun']]['names'].append({'FirstName' : row['FirstName'], 'AthleteID' : row['AthleteID']})
+                            s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastVolParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            s.text = f"({fstr(row['LastVolParkrun'])})"
+                            s.attrib['class'] = 'volunteer'
+                    if row['JVolunteerThisWeek'] is not None:
+                        if row['JVolunteerThisWeek'] > 0:
+                            if row['LastRunParkrunThisWeek'] > 0 or row['LastVolParkrunThisWeek'] > 0:
+                                b = e.SubElement(td, 'br')
+                            if row['LastVolJParkrun'] not in vollies:
+                                vollies[row['LastVolJParkrun']] = {'URL' : row['LastVolJParkrunURL'], 'names' : []}
+                            vollies[row['LastVolJParkrun']]['names'].append({'FirstName' : row['FirstName'], 'AthleteID' : row['AthleteID']})
+                            s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastVolJParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            s.text = f"({fstr(row['LastVolJParkrun'])})"
+                            s.attrib['class'] = 'volunteer'
+                    row['tmpParkrun'] = row[j]
+                    row[j] = None
+                if i == 'Athlete':
+                    s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'athlete'})
+                    s.text = row['AthleteName']
+                    row['AthleteName'] = None
                 if len(cls) > 0:
                     td.attrib['class'] = cls
                 if type(row[j]).__name__ in ['int', 'float', 'str']:
                     td.text = fstr(row[j])
     
-    s = e.SubElement(body,'style')
+    
+    s = e.SubElement(vollyP, 'span')
+    s.text = 'A shout out to our top 100 statespeople who chose to volunteer this weekend: '
+    for p in vollies:
+        for v in vollies[p]['names']:
+            s = e.SubElement(vollyP, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={v['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+            s.text = v['FirstName']
+            s = e.SubElement(vollyP, 'span')
+            if len(vollies[p]['names']) > 1:
+                s.text = f"{concat(v, vollies[p]['names'])}"
+        s = e.SubElement(vollyP, 'span')
+        s.text = ' at '
+        s = e.SubElement(vollyP, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{vollies[p]['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+        s.text = p
+        s = e.SubElement(vollyP, 'span')
+        if p == list(vollies.keys())[-2]:
+            s.text = ', and '
+        else:
+            s.text = ', '
+    s.text = ''
+                         
+    
+    s = e.SubElement(head,'style')
     s.text = StyleSheet
-    x = e.tostring(root).decode('utf-8').replace('&amp;','&')
+
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    addSig(sec)
+    
+    x = e.tostring(root, pretty_print=True).decode('utf-8').replace('&amp;','&')
     with open('output.html','w') as f:
         f.write(x)
         #lxml.html.open_in_browser(root)    
@@ -586,27 +862,40 @@ def subRegionStatsReport():
 
     service = gMail.auth()
     
-    
+
+    colgroups = {
+        'Parkrun'                                                   : ['Parkrun'],
+        'Finishers<br>Volunteers'                                   : ['Finishers', 'Volunteers'],
+        'Total'                                                     : ['Total'],
+        f'{datetime.now().year - 1}<br>{datetime.now().year - 1} %' : ['Last Year', 'Last Year %'],
+        }
     
     maillist = c.execute('SELECT Email, AddressTo, SubRegionName from SubRegions WHERE Email IS NOT NULL')
     for m in maillist:
         root = e.Element('html', version = '5.0')
+        head = e.SubElement(root, 'head')
         body = e.SubElement(root, 'body')
         p = e.SubElement(body,'p')
         p.text = f"Hi {m['AddressTo']}. Below is this weeks {m['SubRegionName']} stats"
-        p = e.SubElement(e.SubElement(body,'p'),'br')
         
         stats = c.execute(f"select ParkrunName as Parkrun, TotalRunners as Finishers, TotalVolunteers as Volunteers, Total, LastYear as [Last Year], LastYearP as [Last Year %], CalendarType from qrySubRegionStats where SubRegionName = '{m['SubRegionName']}'")
         
-        t = e.SubElement(body,'table')
-        thead = e.SubElement(t,'thead')
-        tr = e.SubElement(thead,'tr')
-        for i in list(stats[0].keys()):
-            if i in ['CalendarType']:
-                continue
-            td = e.SubElement(tr,'th')
-            td.text = i
-            td.attrib['class'] = 'header'
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
+        t = e.SubElement(sec,'table')
+        for i in colgroups:
+            col = e.SubElement(t, 'colgroup', {'span': f"{len(colgroups[i])}"})
+        tr1 = e.SubElement(t,'tr', {'class' : 'firstrow'})
+        
+        for i in colgroups:
+            h = str(i).split('<br>')
+            if len(h) == 1:
+                td = e.SubElement(tr1,'th', {'scope' : 'colgroup'})
+                td.text = h[0]
+            else:
+                td = e.SubElement(tr1,'th', {'scope' : 'colgroup'})
+                td.text = h[0]
+                td = e.SubElement(tr1,'th', {'scope': 'col'})
+                td.text = str(h[1])
         
         rowcount = 0
         for row in stats:
@@ -646,18 +935,15 @@ def subRegionStatsReport():
                 if len(fstr(v)) > 0:
                     td.text = fstr(v)
         
-        p = e.SubElement(e.SubElement(body,'p'),'br')
-        p = e.SubElement(body,'p')
-        p.text = 'This email is automatically generated.  I have tested the process of generating it as much as I could, however there may be issues in the future that arise that I have not yet tested for.'
-        p = e.SubElement(body,'p')
-        p.text = "If there are any errors in the data, or the email it's self, then please let me know so I can correct them."
-        p = e.SubElement(e.SubElement(body,'p'),'br')
-        p = e.SubElement(body,'p')
-        p.text = 'Cheers, Paul Ellis.'
 
-        s = e.SubElement(body,'style')
+        s = e.SubElement(head,'style')
         s.text = StyleSheet
-        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"{m['SubRegionName']} stats for this weekend", lxml.html.tostring(root).decode('utf-8')))
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
+        addSig(sec)
+        
+        with open(f"{m['SubRegionName']}.html", 'w') as f:
+            f.write(e.tostring(root, pretty_print=True).decode('utf-8'))
+        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"{m['SubRegionName']} stats for this weekend", lxml.html.tostring(root).decode('utf-8')))
 
 def parkrunMilestoneMailout():
     
@@ -673,22 +959,80 @@ def parkrunMilestoneMailout():
     
     
     
-    maillist = c.execute('SELECT Email, ParkrunName, Detailed from Parkruns WHERE Subscribed = 1')
+    maillist = c.execute('SELECT Email, ParkrunName, Detailed from Parkruns WHERE Subscribed <> 0')
     for m in maillist:
         root = e.Element('html', version = '5.0')
+        head = e.SubElement(root, 'head')
         body = e.SubElement(root, 'body')
-        h = e.SubElement(body,'h3')
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
+        h = e.SubElement(sec,'h3')
         h.text = f"Upcomming milestones for {m['ParkrunName']} parkrun"
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
         
         if m['Detailed']:
-            buildDetailParkrunReport(m['ParkrunName'], body)
+            buildDetailParkrunReport(m['ParkrunName'], sec)
         else:
-            buildSummaryParkrunReport(m['ParkrunName'], body)
-        s = e.SubElement(body,'style')
+            buildSummaryParkrunReport(m['ParkrunName'], sec)
+        s = e.SubElement(head,'style')
         s.text = StyleSheet
-        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
+        addSig(sec)
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
         
         logger.info(f"{r['id']} sent to {m['Email']} for parkrun {m['ParkrunName']}")
     
     listener.stop()
+    
+def addSig(body):
+    sig = e.SubElement(body, 'div')
+    
+    d = e.SubElement(sig, 'div', {'class' : 'name'})
+    d.text = 'Paul Ellis'
+    d = e.SubElement(sig, 'div', {'class' : 'business'})
+    d.text = ''
+    d = e.SubElement(sig, 'div', {'class' : 'container'})
+    c = e.SubElement(d, 'div', {'class' : 'title'})
+    c.text = ''
+    c = e.SubElement(d, 'div', {'class' : 'details'})
+    p = e.SubElement(c, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = ' E:'
+    s = e.SubElement(p, 'a', {'href' : 'mailto:golgothen@gmail.com'})
+    s.text = 'golgothen@gmail.com'
+    p = e.SubElement(c, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = ' M: 0420 413 301'
+    p = e.SubElement(c, 'p')
+    s = e.SubElement(p, 'span')
+    s.text = 'IN:'
+    s = e.SubElement(p, 'a', {'href' : 'https://www.linkedin.com/in/paul-ellis-2822a1189/'})
+    s.text = 'Paul Ellis'
+    d = e.SubElement(sig, 'div', {'class' : 'footer'})
+    
+def mailoutWeeklyReport():
+    listener = LogListener(loggingQueue)
+    listener.start()
+    
+    logging.config.dictConfig(config)
+    logger = logging.getLogger('mailout')
+    
+    c = Connection(config)
+    
+    service = gMail.auth()
+    
+    maillist = c.execute('SELECT Email from Subscribers WHERE Subscribed = 1')
+    
+    with open('output.html','r') as f:
+        doc = f.read()
+    
+    for m in maillist:
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me', m['Email'], f"This weeks parkrun report", doc))
+        logger.info(f"{r['id']} sent to {m['Email']}")
+        print(f"{r['id']} sent to {m['Email']}")
+    
+    listener.stop()
+    
+    
+    
+    
     
