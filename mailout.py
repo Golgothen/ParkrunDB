@@ -225,6 +225,7 @@ def buildDetailParkrunReport(parkrun, node):
            97 <= row['EventCount'] <= 99 or \
            247 <= row['EventCount'] <= 249 or \
            497 <= row['EventCount'] <= 499 or \
+           (7 <= row['EventCount'] <= 9 and row['AgeGroup'].lower() == 'junior') or \
            97 <= row['RunCount'] <= 99:
             cls = 'milestone'
         else:
@@ -970,9 +971,16 @@ def parkrunMilestoneMailout():
         sec = e.SubElement(body, 'div', {'class' : 'section'})
         
         if m['Detailed']:
+            h.text = f"Detailed upcoming milestones for {m['ParkrunName']} parkrun"
             buildDetailParkrunReport(m['ParkrunName'], sec)
         else:
+            h.text = f"Summary upcoming milestones for {m['ParkrunName']} parkrun"
             buildSummaryParkrunReport(m['ParkrunName'], sec)
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
+        p = e.SubElement(sec, 'p')
+        p.text = "This email is automatically generated.  If you believe any of this information to be incorrect then please let me know by replying to this email address."
+        p = e.SubElement(sec, 'p')
+        p.text = "If you no longer wish to receive this email, or would like it sent to a different address, then again, just reply to this email and let me know."
         s = e.SubElement(head,'style')
         s.text = StyleSheet
         sec = e.SubElement(body, 'div', {'class' : 'section'})
