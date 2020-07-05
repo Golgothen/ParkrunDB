@@ -326,7 +326,7 @@ class Worker(multiprocessing.Process):
             self.msgQ.put(Message('Error', self.id, 'URL error in event history. Check ' + url))
             return None
 
-        table = root.xpath('//*[@id="results"]')[0]
+        table = root.xpath('//*[@id="content"]/div[1]/table')[0]
         headings = ['EventNumber','EventDate','Runners','Volunteers']    
         rows = table.xpath('//tbody/tr')
         
@@ -335,14 +335,14 @@ class Worker(multiprocessing.Process):
             d = {}
             for h, v in zip(headings, row.getchildren()):
                 if h == 'EventNumber':
-                    d[h] = int(v.getchildren()[0].text)
+                    d[h] = int(v[0].text)
                 if h in ['Runners','Volunteers']:
                     if v.text.strip() == 'unknown':
                         d[h] = None
                     else: 
                         d[h] = int(v.text)
                 if h == 'EventDate':
-                    d[h] = datetime.strptime(v.getchildren()[0].text,"%d/%m/%Y")
+                    d[h] = datetime.strptime(v[0][0].text,"%d/%m/%Y")
             data.insert(0,d)
         return data
     
