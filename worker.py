@@ -306,8 +306,8 @@ class Worker(multiprocessing.Process):
 
         #if len(eventHTML.split('#')[1].split('-')[0].strip()) == 0:
         #    return 0, None, None
-        eventNumber =  int(eventElement.getchildren()[1].text.split('#')[1].strip())
-        eventDate = datetime.strptime(eventElement.text,'%d/%m/%Y')
+        eventNumber =  int(eventElement[2].text.split('#')[1].strip())
+        eventDate = datetime.strptime(eventElement[0].text,'%d/%m/%Y')
         
         return eventNumber, eventDate, self.getEventTable(root)
 
