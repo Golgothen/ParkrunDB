@@ -315,8 +315,8 @@ def buildSummaryParkrunReport(parkrun, node):
                     td.attrib['class'] = cls
     #return root #lxml.html.tostring()
 
-def buildWeeklyParkrunReport():
-    region = 'Victoria'
+def buildWeeklyParkrunReport(region):
+    #region = 'Queensland'
     root = e.Element('html', version = '5.0')
     head = e.SubElement(root, 'head')
     
@@ -328,7 +328,7 @@ def buildWeeklyParkrunReport():
     p = e.SubElement(body, 'p')
     c = Connection(config)
     
-    
+    """
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Weekend in brief'
@@ -384,13 +384,21 @@ def buildWeeklyParkrunReport():
         for row in data:
             p.text += f"{row['ParkrunName']}{concat(row,data)}"
         p.text = p.text[:-1] +  " yet to post volunteer information."
+    """
     
+    """
     FirstTimers = c.execute(f"select dbo.getWeeklyFirstTimers('{region}')")
     Tourists = c.execute(f"select dbo.getWeeklyTourists('{region}')")
     Volunteers = c.execute(f"select dbo.getWeeklyVolunteers('{region}')")
     TotalPBs = c.execute(f"select dbo.getWeeklyPBs('{region}')")
     TotalRunners = c.execute(f"select dbo.getWeeklyTotalRunners('{region}')")
     TotalRunnersLastWeek = c.execute(f"select dbo.getWeeklyTotalRunnersLastWeek('{region}')")
+    if FirstTimers is None: FirstTimers = 0
+    if Tourists is None: Tourists = 0
+    if Volunteers is None: Volunteers = 0
+    if TotalPBs is None: TotalPBs = 0
+    if TotalRunners is None: TotalRunners = 0
+    if TotalRunnersLastWeek is None: TotalRunnersLastWeek = 0
     
     p = e.SubElement(sec, 'p')
     p.text = f"We had {TotalRunners:,.0f} runners ({direction(TotalRunners - TotalRunnersLastWeek)} by {abs(TotalRunners - TotalRunnersLastWeek):,.0f} or {abs(TotalRunnersLastWeek - TotalRunners) / TotalRunners:.2%}), with {TotalPBs:,.0f} PB's ({TotalPBs / TotalRunners:.2%}), {Tourists:,.0f} tourists visiting new events for the first time, and {FirstTimers:,.0f} first timers, supported by {Volunteers} volunteers."
@@ -460,11 +468,11 @@ def buildWeeklyParkrunReport():
         s = e.SubElement(p, 'span')
         s.text = f" ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
     s.text += '.'
+    """
     
     
     
-    
-    
+    """
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'The fastest among us'
@@ -503,7 +511,7 @@ def buildWeeklyParkrunReport():
             else:
                 s.text += ' for the first time'
         s.text += '.'
-    
+    """
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
@@ -627,7 +635,7 @@ def buildWeeklyParkrunReport():
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
-    p.text = f'Kodos to the vollies'
+    p.text = f'Kudos to the vollies'
     vollyP = e.SubElement(sec, 'p')
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
@@ -824,7 +832,7 @@ def buildWeeklyParkrunReport():
                 if type(row[j]).__name__ in ['int', 'float', 'str']:
                     td.text = fstr(row[j])
     
-    
+    """
     s = e.SubElement(vollyP, 'span')
     s.text = 'A shout out to our top 100 statespeople who chose to volunteer this weekend: '
     for p in vollies:
@@ -844,7 +852,7 @@ def buildWeeklyParkrunReport():
         else:
             s.text = ', '
     s.text = ''
-                         
+    """                     
     
     s = e.SubElement(head,'style')
     s.text = StyleSheet
