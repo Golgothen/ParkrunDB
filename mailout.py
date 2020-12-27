@@ -511,7 +511,6 @@ def buildWeeklyParkrunReport(region):
             else:
                 s.text += ' for the first time'
         s.text += '.'
-    """
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
@@ -637,6 +636,7 @@ def buildWeeklyParkrunReport(region):
     p = e.SubElement(sec, 'h3')
     p.text = f'Kudos to the vollies'
     vollyP = e.SubElement(sec, 'p')
+    """
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
