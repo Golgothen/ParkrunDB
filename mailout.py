@@ -22,6 +22,7 @@ loggingQueue = multiprocessing.Queue()
 config = sender_config
 config['handlers']['queue']['queue'] = loggingQueue
 
+
 StyleSheet = """ 
                 body {
                     font-family: 'Montserrat', sans-serif;
