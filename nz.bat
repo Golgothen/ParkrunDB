@@ -1,0 +1,1 @@
+python parkrundl.py --processes 1 --delay 3 --country "new zealand" --volunteer no

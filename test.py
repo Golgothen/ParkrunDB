@@ -148,8 +148,8 @@ def printv():
         print(v)
     print(len(volunteers))
 
-root = getURL('https://www.parkrun.com.au/bannockburnbush/results/latestresults/')
-eventURL = 'bannockburnbush'
+root = getURL('http://www.parkrun.com.au/tedscobieoval/results/latestresults/')
+eventURL = 'albert-melbourne'
 
 #def getVolunteers(root):
     

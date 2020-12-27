@@ -3,29 +3,37 @@
 logger = logging.getLogger(__name__)
     
     
-def getURL(url):
+def getURL(url, proxy):
     completed = False
     while not completed:
+        logger.debug('Hitting {}'.format(url))
         try:
-            logger.debug('Hitting {}'.format(url))
-            f = urlopen(Request(url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}))
-            completed = True
+            response = requests.get(url, proxies={"http": proxy, "https": proxy}, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}, timeout = 10)
+            if response.status_code != 200:
+                logger.warning('Got HTTP Error {}'.format(e.code))
+            if response.status_code in [404, 403]:
+                return None
+        except:
+            return None
+        completed = True
+        """
         except HTTPError as e:
             logger.warning('Got HTTP Error {}'.format(e.code))
             if e.code == 404:
-                self.msgQ.put(Message('Error',self.id, 'Bad URL ' + url))
+                #self.msgQ.put(Message('Error',self.id, 'Bad URL ' + url))
                 return None
             if e.code == 403:
-                self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
+                #self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
                 return None
-            self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
-            sleep(1)
+            #self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
+            sleep(5)
         except:
             logger.warning('Unexpected network error. URL: ' + url)
-            self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
+            #self.msgQ.put(Message('Error', self.id, 'Bad URL ' + url))
             return None
-    temp = f.read().decode('utf-8', errors='ignore')
-    logger.debug('URL returned string of length {}'.format(len(temp)))
+        """
+    temp = response.text#.decode('utf-8', errors='ignore')
+    #self.logger.debug('URL returned string of length {}'.format(len(temp)))
     return lxml.html.fromstring(temp) 
 
 def getEventTable(root):

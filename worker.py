@@ -337,12 +337,12 @@ class Worker(multiprocessing.Process):
                 if h == 'EventNumber':
                     d[h] = int(v[0].text)
                 if h in ['Runners','Volunteers']:
-                    if v.text.strip() == 'unknown':
+                    if 'unknown' in v.text.lower():
                         d[h] = None
                     else: 
                         d[h] = int(v.text)
                 if h == 'EventDate':
-                    d[h] = datetime.strptime(v[0][0].text,"%d/%m/%Y")
+                    d[h] = datetime.strptime(v[0][0][0].text,"%d/%m/%Y")
             data.insert(0,d)
         return data
     
@@ -356,8 +356,8 @@ class Worker(multiprocessing.Process):
         try:
                                   
             parkrun = root.xpath('//*[@id="content"]/div[1]/div[1]/h1')[0].text.strip().split(' parkrun')[0]
-            eventnumber = int(root.xpath('//*[@id="content"]/div[1]/div[1]/h3/span[2]')[0].text.strip().split('#')[1].strip().split()[0])
-            date = datetime.strptime(root.xpath('//*[@id="content"]/div[1]/div[1]/h3')[0].text,'%d/%m/%Y')
+            eventnumber = int(root.xpath('//*[@id="content"]/div[1]/div[1]/h3/span[3]')[0].text.strip().split('#')[1].strip().split()[0])
+            date = datetime.strptime(root.xpath('//*[@id="content"]/div[1]/div[1]/h3/span[1]')[0].text,'%d/%m/%Y')
         except ValueError:
             self.logger.error("Page error for event {}. Skipping.".format(eventURL))
             return

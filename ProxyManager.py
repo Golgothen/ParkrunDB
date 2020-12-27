@@ -132,6 +132,7 @@ class ProxyManager(multiprocessing.Process):
         self.__proxyList = []
         self.__tester_thread_count = 50
         self.__tester_threads = []
+        self.__getter_threads = []
         self.config = config
     
     def addCrawler(self, newCrawler):
@@ -196,6 +197,29 @@ class ProxyManager(multiprocessing.Process):
         #self.__proxyList = [i for i in self.__proxyList if i != x]
         return x
     
+    def getURL(self, url, returnPipe):
+        x = threading.Thread(target = self.__getURL, args = (url, returnPipe,), daemon = True)
+        self.__getter_threads.append(x)
+        x.start()
+    
+    def __getURL(self, url, returnPipe):
+        completed = False
+        proxy = self.getProxy()
+        while not completed:
+            self.logger.debug(f"Hitting {url} with proxy {proxy['proxy']}")
+            try:
+                response = requests.get(url, proxies={"http": proxy['proxy'], "https": proxy['proxy']}, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}, timeout = 10)
+            except:
+                proxy = self.getProxy()
+                continue
+            if response.code != 200:
+                proxy = self.getProxy()
+                continue
+            completed = True
+            self.__proxies.put(proxy)       # Put the proxy back in the queue if it worked
+        temp = response.text#.decode('utf-8', errors='ignore')
+        returnPipe.send(lxml.html.fromstring(temp)) 
+
     def run(self):
         logging.config.dictConfig(self.config)
         self.logger = logging.getLogger(__name__)

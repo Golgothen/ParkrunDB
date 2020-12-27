@@ -19,7 +19,7 @@ sender_config = {
             'level':       'DEBUG',
         },
         'worker': {
-            'level':       'INFO',
+            'level':       'DEBUG',
         },
         'parkrunlist': {
             'level':       'DEBUG',
