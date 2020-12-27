@@ -84,12 +84,12 @@ class ParkrunList():
                 if row['Parkrun'] in self.__parkruns:
                     self.logger.debug('Removing event {}'.format(row['Parkrun']))
                     del self.__parkruns[row['Parkrun']]
-        data = c.execute("SELECT * FROM getParkrunCancellationsThisWeek")
-        if self.mode == Mode.NEWEVENTS:
-            for row in data:
-                if row['Parkrun'] in self.__parkruns:
-                    self.logger.debug('Removing cancelled event {}'.format(row['Parkrun']))
-                    del self.__parkruns[row['Parkrun']]
+        #data = c.execute("SELECT * FROM getParkrunCancellationsThisWeek")
+        #if self.mode == Mode.NEWEVENTS:
+        #    for row in data:
+        #        if row['Parkrun'] in self.__parkruns:
+        #            self.logger.debug('Removing cancelled event {}'.format(row['Parkrun']))
+        #            del self.__parkruns[row['Parkrun']]
             
     def __iter__(self):
         for k in self.__parkruns.keys():
