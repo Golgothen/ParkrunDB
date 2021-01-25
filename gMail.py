@@ -73,6 +73,7 @@ def CreateMessage(sender, to, subject, message_text):
     #message = MIMEText('text','html')
     
     message['to'] = to
+    #message['to'] = 'golgothen@gmail.com'
     message['from'] = sender
     message['bcc'] = 'golgothen@gmail.com'
     message['subject'] = subject

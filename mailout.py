@@ -329,7 +329,7 @@ def buildWeeklyParkrunReport(region):
     p = e.SubElement(body, 'p')
     c = Connection(config)
     
-    """
+    
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Weekend in brief'
@@ -385,9 +385,9 @@ def buildWeeklyParkrunReport(region):
         for row in data:
             p.text += f"{row['ParkrunName']}{concat(row,data)}"
         p.text = p.text[:-1] +  " yet to post volunteer information."
-    """
     
-    """
+    
+    
     FirstTimers = c.execute(f"select dbo.getWeeklyFirstTimers('{region}')")
     Tourists = c.execute(f"select dbo.getWeeklyTourists('{region}')")
     Volunteers = c.execute(f"select dbo.getWeeklyVolunteers('{region}')")
@@ -469,11 +469,7 @@ def buildWeeklyParkrunReport(region):
         s = e.SubElement(p, 'span')
         s.text = f" ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
     s.text += '.'
-    """
     
-    
-    
-    """
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'The fastest among us'
@@ -637,7 +633,6 @@ def buildWeeklyParkrunReport(region):
     p = e.SubElement(sec, 'h3')
     p.text = f'Kudos to the vollies'
     vollyP = e.SubElement(sec, 'p')
-    """
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
@@ -833,7 +828,6 @@ def buildWeeklyParkrunReport(region):
                 if type(row[j]).__name__ in ['int', 'float', 'str']:
                     td.text = fstr(row[j])
     
-    """
     s = e.SubElement(vollyP, 'span')
     s.text = 'A shout out to our top 100 statespeople who chose to volunteer this weekend: '
     for p in vollies:
@@ -853,7 +847,6 @@ def buildWeeklyParkrunReport(region):
         else:
             s.text = ', '
     s.text = ''
-    """                     
     
     s = e.SubElement(head,'style')
     s.text = StyleSheet
