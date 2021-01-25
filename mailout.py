@@ -412,7 +412,10 @@ def buildWeeklyParkrunReport(region):
         a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
         a.text = row['ParkrunName']
         s = e.SubElement(p, 'span')
-        s.text = f" ({row['ThisWeek']}, {direction(row['RunnersChange'])} {abs(row['RunnersChange'])}){concat(row,data)}"
+        if row['RunnersChange'] is not None:
+            s.text = f" ({row['ThisWeek']}, {direction(row['RunnersChange'])} {abs(row['RunnersChange'])}){concat(row,data)}"
+        else:
+            s.text = f" ({row['ThisWeek']}, returning){concat(row,data)}"
     s.text += '.'
     
     data = c.execute(f"select top(5) ParkrunName, URL, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' order by LastWeekP desc")
@@ -946,7 +949,7 @@ def subRegionStatsReport():
         
         with open(f"{m['SubRegionName']}.html", 'w') as f:
             f.write(e.tostring(root, pretty_print=True).decode('utf-8'))
-        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"{m['SubRegionName']} stats for this weekend", lxml.html.tostring(root).decode('utf-8')))
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"{m['SubRegionName']} stats for this weekend", lxml.html.tostring(root).decode('utf-8')))
 
 def parkrunMilestoneMailout():
     
@@ -987,7 +990,7 @@ def parkrunMilestoneMailout():
         s.text = StyleSheet
         sec = e.SubElement(body, 'div', {'class' : 'section'})
         addSig(sec)
-        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
         
         logger.info(f"{r['id']} sent to {m['Email']} for parkrun {m['ParkrunName']}")
     
@@ -1020,6 +1023,11 @@ def addSig(body):
     d = e.SubElement(sig, 'div', {'class' : 'footer'})
     
 def mailoutWeeklyReport():
+    
+    """
+    Weekly parkrun report to all subscribers
+    """
+    
     listener = LogListener(loggingQueue)
     listener.start()
     
