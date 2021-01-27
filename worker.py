@@ -381,12 +381,27 @@ class Worker(multiprocessing.Process):
             ln = ln.replace("'","''").strip()
             volunteers.append({'AthleteID': int(v.get('href').split('=')[1]), 'FirstName': fn, 'LastName' : ln, 'NameString':nameString, 'Volunteer':{}})
         
+        
+        # Check for deleted volunteer credits
+        vl = c.execute("SELECT Athletes.AthleteID, FirstName, LastName FROM EventVolunteers  INNER JOIN Athletes on Athletes.AthleteID = EventVolunteers.AthleteID WHERE EventID = dbo.getEventID('{}', {})".format(eventURL, eventnumber))
+        for v in vl:
+            found = False
+            for vn in volunteers:
+                if v['AthleteID'] == vn['AthleteID']:
+                    found = True
+                    break
+            if not found:
+                self.logger.info('Deleting volunteer credit for {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
+                c.execute("DELETE FROM EventVolunteers where AthleteID = {} AND EventID = dbo.getEventID('{}', {})".format(v['AthleteID'],eventURL, eventnumber))
+
         # Remove athletes that already have volunteered for this event
         vl = c.execute("SELECT Athletes.AthleteID, FirstName, LastName FROM EventVolunteers  INNER JOIN Athletes on Athletes.AthleteID = EventVolunteers.AthleteID WHERE EventID = dbo.getEventID('{}', {})".format(eventURL, eventnumber))
         for v in vl:
             volunteers = [x for x in volunteers if x['AthleteID'] != v['AthleteID']]
-            self.logger.info('Deleting {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
-        
+            self.logger.info('Already credited {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
+        for v in volunteers:
+            self.logger.info('Remaining {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
+            
         #See if the volunteer roster is still available
         eventRoster = self.getURL('https://www.parkrun.com.au/{}/futureroster/'.format(eventURL))
         roster = eventRoster.xpath('//*[@id="rosterTable"]')
