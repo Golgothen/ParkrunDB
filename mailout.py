@@ -521,7 +521,7 @@ def buildWeeklyParkrunReport(region):
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Reaching Milestones'
-    milestones = [500, 250, 100, 50, 10]
+    milestones = [500, 250, 100, 50]
     
     for m in milestones:
         data = c.execute(f"select * from getWeeklyMilestones('{region}', {m}) order by ParkrunName, LastName")
