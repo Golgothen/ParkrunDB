@@ -407,8 +407,15 @@ def buildWeeklyParkrunReport(region):
     if TotalRunners is None: TotalRunners = 0
     if TotalRunnersLastWeek is None: TotalRunnersLastWeek = 0
     
+    
     p = e.SubElement(sec, 'p')
-    p.text = f"We had {TotalRunners:,.0f} runners ({direction(TotalRunners - TotalRunnersLastWeek)} by {abs(TotalRunners - TotalRunnersLastWeek):,.0f} or {abs(TotalRunnersLastWeek - TotalRunners) / TotalRunners:.2%}), with {TotalPBs:,.0f} PB's ({TotalPBs / TotalRunners:.2%}), {Tourists:,.0f} tourists visiting new events for the first time, and {FirstTimers:,.0f} first timers, supported by {Volunteers} volunteers."
+    p.text = f"We had {TotalRunners:,.0f} runners ({direction(TotalRunners - TotalRunnersLastWeek)} by {abs(TotalRunners - TotalRunnersLastWeek):,.0f}"
+    if TotalRunners > 0:
+        p.text += f" or {abs(TotalRunnersLastWeek - TotalRunners) / TotalRunners:.2%})"
+    p.text += f", with {TotalPBs:,.0f} PB's"
+    if TotalRunners > 0:
+        p.text += f" ({TotalPBs / TotalRunners:.2%})"
+    p.text += f", {Tourists:,.0f} tourists visiting new events for the first time, and {FirstTimers:,.0f} first timers, supported by {Volunteers} volunteers."
     
     data = c.execute(f"select top(5) ParkrunName, URL, ThisWeek, RunnersChange from qryWeeklyParkrunEventSize where Region='{region}' order by ThisWeek desc")
     p = e.SubElement(sec, 'p')
@@ -424,99 +431,106 @@ def buildWeeklyParkrunReport(region):
             s.text = f" ({row['ThisWeek']}, returning){concat(row,data)}"
     s.text += '.'
     
-    data = c.execute(f"select top(5) ParkrunName, URL, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' order by LastWeekP desc")
-    p = e.SubElement(sec, 'p')
-    s = e.SubElement(p, 'span')
-    s.text = "The largest increase by percentage was "
-    for row in data:
-        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        a.text = row['ParkrunName']
+    data = c.execute(f"select top(5) ParkrunName, URL, ThisWeek, LastWeekP from qryWeeklyParkrunEventSize where Region='{region}' and ThisWeek IS NOT NULL order by LastWeekP desc")
+    if len(data)>0:
+        p = e.SubElement(sec, 'p')
         s = e.SubElement(p, 'span')
-        s.text = f" ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
-    s.text += '.'
+        s.text = "The largest increase by percentage was "
+        for row in data:
+            a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            a.text = row['ParkrunName']
+            s = e.SubElement(p, 'span')
+            s.text = f" ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
+        s.text += '.'
     
     data = c.execute(f"select ParkrunName, URL, PBs from getTop5PBs('{region}') order by PBs desc")
-    p = e.SubElement(sec, 'p')
-    s = e.SubElement(p, 'span')
-    s.text = "The most PBs were at "
-    for row in data:
-        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        a.text = row['ParkrunName']
+    if len(data)>0:
+        p = e.SubElement(sec, 'p')
         s = e.SubElement(p, 'span')
-        s.text = f" ({row['PBs']}){concat(row,data)}"
-    s.text += '.'
+        s.text = "The most PBs were at "
+        for row in data:
+            a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            a.text = row['ParkrunName']
+            s = e.SubElement(p, 'span')
+            s.text = f" ({row['PBs']}){concat(row,data)}"
+        s.text += '.'
     
     data = c.execute(f"select ParkrunName, URL, PBs, Percentage from getTop5PBsByPercent('{region}') order by Percentage desc")
-    p = e.SubElement(sec, 'p')
-    s = e.SubElement(p, 'span')
-    s.text = "The most PBs by percentage of field was "
-    for row in data:
-        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        a.text = row['ParkrunName']
+    if len(data)>0:
+        p = e.SubElement(sec, 'p')
         s = e.SubElement(p, 'span')
-        s.text = f" ({row['PBs']} or {row['Percentage']:.0f}%){concat(row,data)}"
-    s.text += '.'
+        s.text = "The most PBs by percentage of field was "
+        for row in data:
+            a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            a.text = row['ParkrunName']
+            s = e.SubElement(p, 'span')
+            s.text = f" ({row['PBs']} or {row['Percentage']:.0f}%){concat(row,data)}"
+        s.text += '.'
     
     data = c.execute(f"select ParkrunName, URL, FirstTimers, Percentage from getTop5FirstTimers('{region}') order by FirstTimers desc")
-    p = e.SubElement(sec, 'p')
-    s = e.SubElement(p, 'span')
-    s.text = "The most first timers were at "
-    for row in data:
-        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        a.text = row['ParkrunName']
+    if len(data)>0:
+        p = e.SubElement(sec, 'p')
         s = e.SubElement(p, 'span')
-        s.text = f" ({row['FirstTimers']}){concat(row,data)}"
-    s.text += '.'
+        s.text = "The most first timers were at "
+        for row in data:
+            a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            a.text = row['ParkrunName']
+            s = e.SubElement(p, 'span')
+            s.text = f" ({row['FirstTimers']}){concat(row,data)}"
+        s.text += '.'
     
     data = c.execute(f"select ParkrunName, URL, FirstTimers, Percentage from getTop5FirstTimersByPercent('{region}') order by Percentage desc")
-    p = e.SubElement(sec, 'p')
-    s = e.SubElement(p, 'span')
-    s.text = "The most first timers by percentage of field was at "
-    for row in data:
-        a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        a.text = row['ParkrunName']
+    if len(data)>0:
+        p = e.SubElement(sec, 'p')
         s = e.SubElement(p, 'span')
-        s.text = f" ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
-    s.text += '.'
+        s.text = "The most first timers by percentage of field was at "
+        for row in data:
+            a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            a.text = row['ParkrunName']
+            s = e.SubElement(p, 'span')
+            s.text = f" ({row['FirstTimers']} or {row['Percentage']:.0f}%){concat(row,data)}"
+        s.text += '.'
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
-    p = e.SubElement(sec, 'h3')
-    p.text = f'The fastest among us'
     data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'F' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
-    d = e.SubElement(sec, 'div')
-    p = e.SubElement(d, 'p')
-    p.text = f"The {len(data)} fastest females in {region} by age category, in pace order, were:"
-    l = e.SubElement(d,'ol')
-    for row in data:
-        li = e.SubElement(l,'li')
-        s = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        s.text = f"{row['Athlete']}"
-        s = e.SubElement(li, 'span')
-        s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
-        if row['Comment'] not in [None, 'PB']:
-            if row['Comment'] == 'New PB!':
-                s.text += f" setting herself a new PB"
-            else:
-                s.text += ' for the first time'
-        s.text += '.'
+    if len(data)>0:
+        p = e.SubElement(sec, 'h3')
+        p.text = f'The fastest among us'
+        d = e.SubElement(sec, 'div')
+        p = e.SubElement(d, 'p')
+        p.text = f"The {len(data)} fastest females in {region} by age category, in pace order, were:"
+        l = e.SubElement(d,'ol')
+        for row in data:
+            li = e.SubElement(l,'li')
+            s = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            s.text = f"{row['Athlete']}"
+            s = e.SubElement(li, 'span')
+            s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
+            if row['Comment'] not in [None, 'PB']:
+                if row['Comment'] == 'New PB!':
+                    s.text += f" setting herself a new PB"
+                else:
+                    s.text += ' for the first time'
+            s.text += '.'
         
-    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'M' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
-    d = e.SubElement(sec, 'div')
-    p = e.SubElement(d, 'p')
-    p.text = f"The {len(data)} fastest males in {region} by age category, in pace order, were:"
-    l = e.SubElement(d,'ol')
-    for row in data:
-        li = e.SubElement(l,'li')
-        s = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        s.text = f"{row['Athlete']}"
-        s = e.SubElement(li, 'span')
-        s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
-        if row['Comment'] not in [None, 'PB']:
-            if row['Comment'] == 'New PB!':
-                s.text += f" setting himself a new PB"
-            else:
-                s.text += ' for the first time'
-        s.text += '.'
+    if len(data)>0:
+        data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'M' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
+        d = e.SubElement(sec, 'div')
+        p = e.SubElement(d, 'p')
+        p.text = f"The {len(data)} fastest males in {region} by age category, in pace order, were:"
+        l = e.SubElement(d,'ol')
+        for row in data:
+            li = e.SubElement(l,'li')
+            s = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
+            s.text = f"{row['Athlete']}"
+            s = e.SubElement(li, 'span')
+            s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
+            if row['Comment'] not in [None, 'PB']:
+                if row['Comment'] == 'New PB!':
+                    s.text += f" setting himself a new PB"
+                else:
+                    s.text += ' for the first time'
+            s.text += '.'
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
@@ -851,10 +865,11 @@ def buildWeeklyParkrunReport(region):
         s = e.SubElement(vollyP, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{vollies[p]['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
         s.text = p
         s = e.SubElement(vollyP, 'span')
-        if p == list(vollies.keys())[-2]:
-            s.text = ', and '
-        else:
-            s.text = ', '
+        if len(vollies)>1:
+            if p == list(vollies.keys())[-2]:
+                s.text = ', and '
+            else:
+                s.text = ', '
     s.text = ''
     
     s = e.SubElement(head,'style')
@@ -1058,6 +1073,13 @@ def mailoutWeeklyReport():
     listener.stop()
     
     
+def part1():
+    buildWeeklyParkrunReport('Victoria')
+
+def part2():
+    #subRegionStatsReport()
+    parkrunMilestoneMailout()
+    mailoutWeeklyReport()
     
     
     
