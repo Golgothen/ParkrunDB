@@ -329,21 +329,25 @@ class Worker(multiprocessing.Process):
         table = root.xpath('//*[@id="content"]/div[1]/table')[0]
         headings = ['EventNumber','EventDate','Runners','Volunteers']    
         rows = table.xpath('//tbody/tr')
-        
+                
         data = []
         for row in rows:
-            d = {}
-            for h, v in zip(headings, row.getchildren()):
-                if h == 'EventNumber':
-                    d[h] = int(v[0].text)
-                if h in ['Runners','Volunteers']:
-                    if 'unknown' in v.text.lower():
-                        d[h] = None
-                    else: 
-                        d[h] = int(v.text)
-                if h == 'EventDate':
-                    d[h] = datetime.strptime(v[0][0][0].text,"%d/%m/%Y")
-            data.insert(0,d)
+            if len(row.getchildren()) != 8:
+                continue
+            else:
+                d = {}
+                for h, v in zip(headings, row.getchildren()):
+                    #print(h)
+                    if h == 'EventNumber':
+                        d[h] = int(v[0].text)
+                    if h in ['Runners','Volunteers']:
+                        if 'unknown' in v.text.lower():
+                            d[h] = None
+                        else: 
+                            d[h] = int(v.text)
+                    if h == 'EventDate':
+                        d[h] = datetime.strptime(v[0][0][0].text,"%d/%m/%Y")
+                data.insert(0,d)
         return data
     
     def getVolunteers(self, root, eventURL):
