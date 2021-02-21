@@ -409,7 +409,11 @@ class Worker(multiprocessing.Process):
         #See if the volunteer roster is still available
         eventRoster = self.getURL('https://www.parkrun.com.au/{}/futureroster/'.format(eventURL))
         roster = eventRoster.xpath('//*[@id="rosterTable"]')
-        FirstRosterDate = datetime.strptime(roster[0][0][0][1].text,'%d %B %Y')
+        FirstRosterDate = None
+        try:
+            FirstRosterDate = datetime.strptime(roster[0][0][0][1].text,'%d %B %Y')
+        except:
+            pass
         if FirstRosterDate == date:
             #Roster for today is available
             self.logger.info('Downloading event roster')
