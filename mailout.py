@@ -439,8 +439,9 @@ def buildWeeklyParkrunReport(region):
         for row in data:
             a = e.SubElement(p, 'a', {'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
             a.text = row['ParkrunName']
-            s = e.SubElement(p, 'span')
-            s.text = f" ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
+            if row['LastWeekP'] is not None:
+                s = e.SubElement(p, 'span')
+                s.text = f" ({row['ThisWeek']}, {direction(row['LastWeekP'])} {abs(row['LastWeekP']):.0f}%){concat(row,data)}"
         s.text += '.'
     
     data = c.execute(f"select ParkrunName, URL, PBs from getTop5PBs('{region}') order by PBs desc")
@@ -1077,7 +1078,7 @@ def part1():
     buildWeeklyParkrunReport('Victoria')
 
 def part2():
-    #subRegionStatsReport()
+    subRegionStatsReport()
     parkrunMilestoneMailout()
     mailoutWeeklyReport()
     
