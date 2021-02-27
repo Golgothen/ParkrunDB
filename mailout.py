@@ -377,7 +377,7 @@ def buildWeeklyParkrunReport(region):
 
     data = c.execute(f"select ParkrunName, URL from getParkrunNoVolunteers('{region}') order by ParkrunName")
     s = e.SubElement(p, 'span')
-    s.text = ", and "
+    s.text = ", with "
     if len(data) == 0:
         s.text += "all volunteer information recorded."
     elif len(data) == 1:
