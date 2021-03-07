@@ -752,7 +752,7 @@ def buildWeeklyParkrunReport(region):
                         if row[j] == 99:
                             p = e.SubElement(msgs, 'p')
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                            a.text = row['FirstName']
+                            a.text = f"{row['FirstName']} {row['LastName']}" 
                             s = e.SubElement(p, 'span')
                             s.text = 'is set set to join the Cowell club next week.'
                 if j == 'DifferentEvents':
@@ -761,7 +761,7 @@ def buildWeeklyParkrunReport(region):
                         if row[j] == 100 and row['LastRunParkrunThisWeek'] > 0:
                             p = e.SubElement(msgs, 'p')
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                            a.text = row['FirstName']
+                            a.text = f"{row['FirstName']} {row['LastName']}"
                             s = e.SubElement(p, 'span')
                             s.text = f" achieved {genderPosessive(row['Gender'])} Cowell at "
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
@@ -774,14 +774,14 @@ def buildWeeklyParkrunReport(region):
                         cls += ' approachingmilestone'
                         p = e.SubElement(msgs, 'p')
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                        a.text = row['FirstName']
+                        a.text = f"{row['FirstName']} {row['LastName']}"
                         s = e.SubElement(p, 'span')
                         s.text = f" is set to run {genderPosessive(row['Gender'])} {row['EventCount'] + 1}th parkrun next week."
                     if row[j] in [50, 100, 250, 500]:
                         cls += f' milestone{row[j]}'
                         p = e.SubElement(msgs, 'p')
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                        a.text = row['FirstName']
+                        a.text = f"{row['FirstName']} {row['LastName']}"
                         s = e.SubElement(p, 'span')
                         s.text = f" ran {genderPosessive(row['Gender'])} {row['EventCount']}th parkrun at "
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
@@ -793,7 +793,7 @@ def buildWeeklyParkrunReport(region):
                         cls += ' milestone50'
                         p = e.SubElement(msgs, 'p')
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                        a.text = row['FirstName']
+                        a.text = f"{row['FirstName']} {row['LastName']}"
                         s = e.SubElement(p, 'span')
                         s.text = f" ups {genderPosessive(row['Gender'])} p index to {row['pIndex']} at "
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
@@ -806,7 +806,7 @@ def buildWeeklyParkrunReport(region):
                         if j == 'wIndex':
                             p = e.SubElement(msgs, 'p')
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                            a.text = row['FirstName']
+                            a.text = f"{row['FirstName']} {row['LastName']}"
                             s = e.SubElement(p, 'span')
                             s.text = f" ups {genderPosessive(row['Gender'])} Wilson index by {row['wIndexChange']} to {row['wIndex']} at "
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
