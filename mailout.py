@@ -1088,8 +1088,8 @@ def parkrunMilestoneMailout():
         s.text = StyleSheet
         sec = e.SubElement(body, 'div', {'class' : 'section'})
         addSig(sec)
-        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
-        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
         
         logger.info(f"{r['id']} sent to {m['Email']} for parkrun {m['ParkrunName']}")
     
