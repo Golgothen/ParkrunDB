@@ -145,6 +145,9 @@ class Worker(multiprocessing.Process):
                 if e.code == 403:
                     self.msgQ.put(Message('Error',self.id, 'Forbidden ' + url))
                     return None
+                if e.code == 500:
+                    self.msgQ.put(Message('Error',self.id, 'Server Error ' + url))
+                    return None
                 self.msgQ.put(Message('Error', self.id, 'Got response {}. retrying in 1 second'.format(e.code)))
                 sleep(self.delay)
             except:
@@ -341,10 +344,10 @@ class Worker(multiprocessing.Process):
                     if h == 'EventNumber':
                         d[h] = int(v[0].text)
                     if h in ['Runners','Volunteers']:
-                        if 'unknown' in v.text.lower():
-                            d[h] = None
-                        else: 
+                        try:
                             d[h] = int(v.text)
+                        except:
+                            d[h] = None
                     if h == 'EventDate':
                         d[h] = datetime.strptime(v[0][0][0].text,"%d/%m/%Y")
                 data.insert(0,d)
