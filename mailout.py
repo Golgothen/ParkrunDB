@@ -318,6 +318,65 @@ def buildSummaryParkrunReport(parkrun, node):
                         td.attrib['class'] = cls
     #return root #lxml.html.tostring()
 
+def buildVolunteerMilestoneReport(parkrun, node):
+    c = Connection(config)
+    data = c.execute(f"select * from qryParkrunVolunteerMilestone where Parkrun = '{parkrun}' order by TotalVolunteerCount desc")
+    
+    colgroups = {
+        'Barcode<br>Name<br>Club'             : ['AthleteID', 'Name','ClubName'],
+        'Total<br>Home'                       : ['TotalVolunteerCount', 'EventVolunteerCount'],
+        'Gender<br>Age Cat<br>Age Grp'        : ['Gender', 'AgeCategory', 'AgeGroup']
+        }
+    
+    
+    rowcount = 0
+    if len(data) == 0:
+        s = e.SubElement(node,'Span')
+        s.text = 'There are no upcoming volunteer milestones this week.'
+    else:
+        t = e.SubElement(node,'table')
+        for i in colgroups:
+            col = e.SubElement(t, 'colgroup', {'span': f"{len(colgroups[i])}"})
+        tr1 = e.SubElement(t,'tr', {'class' : 'firstrow'})
+        
+        for i in colgroups:
+            h = str(i).split('<br>')
+            td = e.SubElement(tr1,'th', {'scope' : 'colgroup'})
+            td.text = h[0]
+            for i in range(1,len(h)):
+                td = e.SubElement(tr1,'th', {'scope': 'col'})
+                td.text = str(h[i])
+        for row in data:
+            if rowcount == 0:
+                cls = 'altrow1'
+            else:
+                cls = 'altrow2'
+            tr = e.SubElement(t, 'tr', CLASS=cls)
+            rowcount += 1
+            if rowcount> 1:
+                rowcount = 0
+            else:
+                cls = ''
+            for k in colgroups:
+                for i in colgroups[k]:
+                    cls = ''
+                    td = e.SubElement(tr, 'td')
+                    if type(row[i]).__name__ == 'int':
+                        cls = 'number'
+                    else:
+                        cls='text'
+                    if i in ['Gender', 'AgeGroup']:
+                        cls = 'centered'
+                    if len(fstr(row[i])) > 0:
+                        td.text = fstr(row[i])
+                    if i == 'AthleteID':
+                        cls = 'text' 
+                    if row == data[-1]:
+                        cls += ' lastrow'
+                    if len(cls) > 0:
+                        td.attrib['class'] = cls
+    #return root #lxml.html.tostring()
+
 def buildWeeklyParkrunReport(region):
     #region = 'Queensland'
     root = e.Element('html', version = '5.0')
@@ -347,7 +406,7 @@ def buildWeeklyParkrunReport(region):
     elif len(data) == 1:
         s.text = f"{data[0]['ParkrunName']} was the only "
         a = e.SubElement(p, 'a', {'href' : 'https://www.parkrun.com.au/cancellations/', 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        a.text = 'calncellation'
+        a.text = 'cancellations'
     else:
         s = e.SubElement(p, 'span')
         s.text = ''
@@ -377,7 +436,7 @@ def buildWeeklyParkrunReport(region):
 
     data = c.execute(f"select ParkrunName, URL from getParkrunNoVolunteers('{region}') order by ParkrunName")
     s = e.SubElement(p, 'span')
-    s.text = ", with "
+    s.text = ", and "
     if len(data) == 0:
         s.text += "all volunteer information recorded."
     elif len(data) == 1:
@@ -671,13 +730,14 @@ def buildWeeklyParkrunReport(region):
         'Weeks<br>Held'                                      : ['Weeks'],
         'Athlete'                                            : ['AthleteName'],
         'Parkrun'                                            : ['LastRunParkrun'],
-        'Events<br>Local/Total'                              : ['Events', 'DifferentEvents'],
+        'Events<br>Local/Total'                              : ['TotalEvents', 'DifferentEvents'],
         'Total<br>Runs'                                      : ['EventCount'],
         f'Tourist Quotient<br>Overall/{datetime.now().year}' : ['TQ', 'TQTY'],
         f'{datetime.now().year}<br>Run/New'                  : ['TYEventsDone', 'TYNewEvents'],
         f'{datetime.now().year - 1}<br>Run/New'              : ['LYEventsDone', 'LYNewEvents'],
         'P<br>Index'                                         : ['pIndex'],
-        'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange']
+        'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange'],
+        'i&#179;<br>Index'                                   : ['i3']
         }
     
     t = e.SubElement(sec,'table')
@@ -758,7 +818,7 @@ def buildWeeklyParkrunReport(region):
                 if j == 'DifferentEvents':
                     if row[j] in [50, 100]:
                         cls += ' milestone50'
-                        if row[j] == 100 and row['LastRunParkrunThisWeek'] > 0:
+                        if row[j] == 100 and row['LastRunParkrunThisWeek'] > 0 and row['EventChange'] > 0:
                             p = e.SubElement(msgs, 'p')
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                             a.text = f"{row['FirstName']} {row['LastName']}"
@@ -796,6 +856,18 @@ def buildWeeklyParkrunReport(region):
                         a.text = f"{row['FirstName']} {row['LastName']}"
                         s = e.SubElement(p, 'span')
                         s.text = f" ups {genderPosessive(row['Gender'])} p index to {row['pIndex']} at "
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a.text = row['tmpParkrun']
+                        s = e.SubElement(p, 'span')
+                        s.text = "."
+                if j == 'i3':
+                    if row['i3Change'] > 0:
+                        cls += ' milestone50'
+                        p = e.SubElement(msgs, 'p')
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a.text = f"{row['FirstName']} {row['LastName']}"
+                        s = e.SubElement(p, 'span')
+                        s.text = f" ups {genderPosessive(row['Gender'])} i&#179 index to {row['i3']} at "
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                         a.text = row['tmpParkrun']
                         s = e.SubElement(p, 'span')
@@ -1004,6 +1076,10 @@ def parkrunMilestoneMailout():
             h.text = f"Summary upcoming milestones for {m['ParkrunName']} parkrun"
             buildSummaryParkrunReport(m['ParkrunName'], sec)
         sec = e.SubElement(body, 'div', {'class' : 'section'})
+        h = e.SubElement(sec,'h3')
+        h.text = f"Upcoming volunteer milestones for {m['ParkrunName']} parkrun"
+        buildVolunteerMilestoneReport(m['ParkrunName'], sec)
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
         p = e.SubElement(sec, 'p')
         p.text = "This email is automatically generated.  If you believe any of this information to be incorrect then please let me know by replying to this email address."
         p = e.SubElement(sec, 'p')
@@ -1012,8 +1088,8 @@ def parkrunMilestoneMailout():
         s.text = StyleSheet
         sec = e.SubElement(body, 'div', {'class' : 'section'})
         addSig(sec)
-        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
-        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
         
         logger.info(f"{r['id']} sent to {m['Email']} for parkrun {m['ParkrunName']}")
     
