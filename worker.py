@@ -119,7 +119,7 @@ class Worker(multiprocessing.Process):
                                 if row['EventDate'].year == self.year or self.year == 0:
                                     self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], row['EventNumber']))
                                     self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                                    self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'])
+                                    self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['EventNumberURL'] + str(row['EventNumber'])), parkrun['EventURL'], parkrun['URL'])
                                     self.logger.debug('Sleeping for {} seconds'.format(self.delay))
                                     sleep(self.delay)
                 else:
@@ -353,7 +353,7 @@ class Worker(multiprocessing.Process):
                 data.insert(0,d)
         return data
     
-    def getVolunteers(self, root, eventURL):
+    def getVolunteers(self, root, eventURL, parkrunURL):
         c = Connection(self.config)
         
         if root is None:
@@ -410,7 +410,7 @@ class Worker(multiprocessing.Process):
             self.logger.info('Remaining {} {} ({})'.format(v['FirstName'], v['LastName'], v['AthleteID']))
             
         #See if the volunteer roster is still available
-        eventRoster = self.getURL('https://www.parkrun.com.au/{}/futureroster/'.format(eventURL))
+        eventRoster = self.getURL(f'{parkrunURL}/futureroster/')
         roster = eventRoster.xpath('//*[@id="rosterTable"]')
         FirstRosterDate = None
         try:
