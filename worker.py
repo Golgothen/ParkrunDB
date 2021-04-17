@@ -82,7 +82,7 @@ class Worker(multiprocessing.Process):
                         if self.volunteer:
                             self.logger.info('Parkrun {} event {}: volunteers did not match - downloading.'.format(parkrun['EventURL'], parkrun['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating volunteers for ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
-                            self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['LatestResultsURL']), parkrun['EventURL'])
+                            self.getVolunteers(self.getURL(parkrun['URL'] + parkrun['LatestResultsURL']), parkrun['EventURL'], parkrun['URL'])
                     sleep(self.delay)
                 
             if self.mode == Mode.NORMAL:
