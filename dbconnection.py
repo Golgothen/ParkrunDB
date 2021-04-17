@@ -121,8 +121,10 @@ class Connection():
     def replaceParkrunEvent(self, row):
         EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['EventURL'], row['EventNumber']))
         if EventID is not None:
-            self.execute("DELETE FROM Events WHERE EventID = {}".format(EventID))
-        return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['EventURL'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
+            self.execute("DELETE FROM EventPositions WHERE EventID = {}".format(EventID))
+            #self.execute("DELETE FROM Events WHERE EventID = {}".format(EventID))
+        #return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['EventURL'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
+        return EventID
 
     def checkParkrunEvent(self, row):
         r = self.execute("SELECT dbo.getParkrunEventRunners('{}', {})".format(row['EventURL'], row['EventNumber']))
