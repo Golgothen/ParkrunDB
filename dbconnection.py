@@ -138,6 +138,16 @@ class Connection():
 
     def checkParkrunVolunteers(self, row):
         r = self.execute("SELECT dbo.getParkrunEventVolunteers('{}', {})".format(row['EventURL'], row['EventNumber']))
+        if r is None:
+            return False
+        else:
+            if r != row['Runners']:
+                return False
+            else:
+                return True
+
+    def checkParkrunVolunteers(self, row):
+        r = self.execute("SELECT dbo.getParkrunEventVolunteers('{}', {})".format(row['EventURL'], row['EventNumber']))
         if r != row['Volunteers']:
             return False
         else:
