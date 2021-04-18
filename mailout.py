@@ -949,6 +949,12 @@ def buildWeeklyParkrunReport(region):
     s.text = StyleSheet
 
     sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'p')
+    p.text = "That's it from me for another week."
+    p = e.SubElement(sec, 'p')
+    p.text = "Until next week, keep parkrunning."
+
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
     addSig(sec)
     
     x = e.tostring(root, pretty_print=True).decode('utf-8').replace('&amp;','&')
