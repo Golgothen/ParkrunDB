@@ -737,7 +737,7 @@ def buildWeeklyParkrunReport(region):
         f'{datetime.now().year - 1}<br>Run/New'              : ['LYEventsDone', 'LYNewEvents'],
         'P<br>Index'                                         : ['pIndex'],
         'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange'],
-        'i&#179;<br>Index'                                   : ['i3']
+        'i&#179;<br>Index'                                   : ['i3','i3Arrow', 'i3Change']
         }
     
     t = e.SubElement(sec,'table')
@@ -791,8 +791,10 @@ def buildWeeklyParkrunReport(region):
                 if 'Arrow' in j:
                     if j == 'RankArrow':
                         switch = row['RankChange']
-                    else:
+                    elif j == 'WIndexArrow':
                         switch = row['wIndexChange']
+                    else:
+                        switch = row['i3Change']
                     if switch < 0:
                         arr = ' &darr; '
                         scls = ' arrowDown'
@@ -863,15 +865,16 @@ def buildWeeklyParkrunReport(region):
                 if j == 'i3':
                     if row['i3Change'] > 0:
                         cls += ' milestone50'
-                        p = e.SubElement(msgs, 'p')
-                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                        a.text = f"{row['FirstName']} {row['LastName']}"
-                        s = e.SubElement(p, 'span')
-                        s.text = f" ups {genderPosessive(row['Gender'])} i&#179 index to {row['i3']} at "
-                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                        a.text = row['tmpParkrun']
-                        s = e.SubElement(p, 'span')
-                        s.text = "."
+                        if j == 'i3':
+                            p = e.SubElement(msgs, 'p')
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = f"{row['FirstName']} {row['LastName']}"
+                            s = e.SubElement(p, 'span')
+                            s.text = f" ups {genderPosessive(row['Gender'])} i&#179 index by {row['i3Change']} to {row['i3']} at "
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = row['tmpParkrun']
+                            s = e.SubElement(p, 'span')
+                            s.text = "."
                 if j in ['wIndex', 'wIndexChange']:
                     if row['wIndexChange'] > 0:
                         cls += ' milestone50'
