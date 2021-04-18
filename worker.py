@@ -74,7 +74,7 @@ class Worker(multiprocessing.Process):
                         self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['Name'], parkrun['EventNumber']))
                         #if not, delete the old event record and re-import the data
                         self.msgQ.put(Message('Process', self.id, 'Updating ' + parkrun['Name'] + ' event ' + xstr(parkrun['EventNumber'])))
-                        eventID = c.replaceParkrunEvent(parkrun)
+                        eventID = c.addParkrunEvent(parkrun)
                         self.logger.debug('getLastEvent found {} runners'.format(len(data)))
                         for row in data:
                             row['EventID'] = eventID
