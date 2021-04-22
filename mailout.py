@@ -5,6 +5,7 @@ import lxml.etree as e
 from mplogger import *
 from dbconnection import Connection
 from datetime import date
+from time import sleep
 
 fstr = lambda s: '' if s is None else str(s)
 
@@ -729,7 +730,7 @@ def buildWeeklyParkrunReport(region):
         'Rank'                                               : ['Rank', 'RankArrow', 'AbsRankChange'],
         'Weeks<br>Held'                                      : ['Weeks'],
         'Athlete'                                            : ['AthleteName'],
-        'Parkrun'                                            : ['LastRunParkrun'],
+        'parkrun'                                            : ['LastRunParkrun'],
         'Events<br>Local/Total'                              : ['TotalEvents', 'DifferentEvents'],
         'Total<br>Runs'                                      : ['EventCount'],
         f'Tourist Quotient<br>Overall/{datetime.now().year}' : ['TQ', 'TQTY'],
@@ -737,7 +738,8 @@ def buildWeeklyParkrunReport(region):
         f'{datetime.now().year - 1}<br>Run/New'              : ['LYEventsDone', 'LYNewEvents'],
         'P<br>Index'                                         : ['pIndex'],
         'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange'],
-        'i&#179;<br>Index'                                   : ['i3','i3Arrow', 'i3Change']
+        'i&#179;<br>Index'                                   : ['i3','i3Arrow', 'i3Change'],
+        'A.M.E.L<br>Rank'                                    : ['AMELRank','AMELArrow', 'AMELChange']
         }
     
     t = e.SubElement(sec,'table')
@@ -793,6 +795,8 @@ def buildWeeklyParkrunReport(region):
                         switch = row['RankChange']
                     elif j == 'WIndexArrow':
                         switch = row['wIndexChange']
+                    elif j == 'AMELArrow':
+                        switch = row['AMELChange']
                     else:
                         switch = row['i3Change']
                     if switch < 0:
@@ -888,6 +892,19 @@ def buildWeeklyParkrunReport(region):
                             a.text = row['tmpParkrun']
                             s = e.SubElement(p, 'span')
                             s.text = "."
+                if j in ['AMELRank', 'AMELChange']:
+                    if row['AMELChange'] > 0:
+                        cls += ' milestone50'
+                        if j == 'AMELRank':
+                            p = e.SubElement(msgs, 'p')
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = f"{row['FirstName']} {row['LastName']}"
+                            s = e.SubElement(p, 'span')
+                            s.text = f" ups {genderPosessive(row['Gender'])} Australian Most Events List ranking by {row['AMELChange']} to {row['AMELRank']} at "
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a.text = row['tmpParkrun']
+                            s = e.SubElement(p, 'span')
+                            s.text = "."
                 if i == 'Parkrun':
                     if row['LastRunParkrunThisWeek'] > 0:
                         s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
@@ -956,6 +973,85 @@ def buildWeeklyParkrunReport(region):
     p.text = "That's it from me for another week."
     p = e.SubElement(sec, 'p')
     p.text = "Until next week, keep parkrunning."
+
+    sleep(2)
+    sec = e.SubElement(body, 'div', {'class' : 'section'})
+    p = e.SubElement(sec, 'h3')
+    p.text = f'Column Names and Descriptions'
+    tbl = e.SubElement(sec,'table')
+    c = e.SubElement(tbl,'colgroup', {'span': '1'})
+    c = e.SubElement(tbl,'colgroup', {'span': '1'})
+ 
+    th = e.SubElement(tbl,'tr', {'class' : 'firstrow'})
+    tr = e.SubElement(th,'th')
+    tr.text = 'Column'
+    tr = e.SubElement(th,'th')
+    tr.text = 'Description'
+    
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    td = e.SubElement(tr,'td')
+    td.text = 'Rank'
+    td = e.SubElement(tr,'td')
+    td.text = 'Statesmanshp ranking for this state.  Note: Non public and junior events will not count toward your ranking.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    td = e.SubElement(tr,'td')
+    td.text = 'Weeks Held'
+    td = e.SubElement(tr,'td')
+    td.text = 'Number of consecutive weeks statesmanship has been held.  On weeks of a double launch, this gets reset to Zero. Note: Athletes with the same rank are secondly sorted by this column.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    td = e.SubElement(tr,'td')
+    td.text = 'Athlete'
+    td = e.SubElement(tr,'td')
+    td.text = "Athlete's name, linking to their profile page"
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    td = e.SubElement(tr,'td')
+    td.text = 'parkrun'
+    td = e.SubElement(tr,'td')
+    td.text = "Last parkrun this athlete ran at, linking to that parkrun's latest result page. Note: If the athlete does not run this week, this will be blank. New parkruns in this state are shown in green, and volunteer parkruns (in any state) are shown in purple."
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    td = e.SubElement(tr,'td')
+    td.text = 'Events Local/Total'
+    td = e.SubElement(tr,'td')
+    td.text = 'Number of different events this athlete has completed.  Local will be in this state, Total will be globally.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    td = e.SubElement(tr,'td')
+    td.text = 'Total Runs'
+    td = e.SubElement(tr,'td')
+    td.text = 'Total number of parkruns completed'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    td = e.SubElement(tr,'td')
+    td.text = 'Tourist Quotient Overall/20xx'
+    td = e.SubElement(tr,'td')
+    td.text = 'Tourist Quotient is a percentage of parkruns completed that were new events. Interstate/international events contribute to this measure.  Total is for the entire history of the athlete, 20xx is for the current year.  Note: Athletes with the same rank and weeks are thirdly sorted by this column'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    td = e.SubElement(tr,'td')
+    td.text = '20xx Run/New'
+    td = e.SubElement(tr,'td')
+    td.text = 'These two sets of columns count the number of events and number of new events completed by this athlete for this year and last year.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    td = e.SubElement(tr,'td')
+    td.text = 'P Index'
+    td = e.SubElement(tr,'td')
+    td.text = 'P index measures the number of different events run a number of times. EG: 4 different events run 4 times each = 4, 6 different events run 6 times each = 6. etc.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    td = e.SubElement(tr,'td')
+    td.text = 'Wilson Index'
+    td = e.SubElement(tr,'td')
+    td.text = 'Highest event number completed in order starting at event 1 (a launch).  Completing an event number at any parkrun contributes to this index.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    td = e.SubElement(tr,'td')
+    td.text = 'i&#179 index'
+    td = e.SubElement(tr,'td')
+    td.text = 'Highest number of parkruns completed in Australia in launch date order, starting at Main Beach.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2 lastrow'})
+    td = e.SubElement(tr,'td')
+    td.text = 'A.M.E.L Rank'
+    td = e.SubElement(tr,'td')
+    td.text = 'Current ranking, and movement of rank from last week, of the Australian Most Events List.'
+    
+    
+    
+    
 
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     addSig(sec)
