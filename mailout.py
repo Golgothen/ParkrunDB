@@ -391,7 +391,7 @@ def buildWeeklyParkrunReport(region):
     p = e.SubElement(body, 'p')
     c = Connection(config)
     
-    
+    """
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Weekend in brief'
@@ -712,7 +712,7 @@ def buildWeeklyParkrunReport(region):
                     n.text += f"on their launch "
                 n.text += f"back on the {ordinal(row['PreviousRecordDate'].day)} of {row['PreviousRecordDate'].strftime('%B, %Y')}"
     
-    
+    """
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Kudos to the vollies'
@@ -889,7 +889,7 @@ def buildWeeklyParkrunReport(region):
                             s = e.SubElement(p, 'span')
                             s.text = f" ups {genderPosessive(row['Gender'])} Wilson index by {row['wIndexChange']} to {row['wIndex']} at "
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                            a.text = row['tmpParkrun']
+                            a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
                 if j in ['AMELRank', 'AMELChange']:
@@ -905,7 +905,7 @@ def buildWeeklyParkrunReport(region):
                             a.text = row['tmpParkrun']
                             s = e.SubElement(p, 'span')
                             s.text = "."
-                if i == 'Parkrun':
+                if i == 'parkrun':
                     if row['LastRunParkrunThisWeek'] > 0:
                         s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                         s.text = fstr(row['LastRunParkrun'])
@@ -933,7 +933,7 @@ def buildWeeklyParkrunReport(region):
                             s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastVolJParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                             s.text = f"({fstr(row['LastVolJParkrun'])})"
                             s.attrib['class'] = 'volunteer'
-                    row['tmpParkrun'] = row[j]
+                    row['tmp'] = row[j]
                     row[j] = None
                 if i == 'Athlete':
                     s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'athlete'})
