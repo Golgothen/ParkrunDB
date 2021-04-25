@@ -6,6 +6,7 @@ from mplogger import *
 from dbconnection import Connection
 from datetime import date
 from time import sleep
+from os import path
 
 fstr = lambda s: '' if s is None else str(s)
 
@@ -391,7 +392,18 @@ def buildWeeklyParkrunReport(region):
     p = e.SubElement(body, 'p')
     c = Connection(config)
     
-    """
+    if path.exists("comments.txt"):
+        sec = e.SubElement(body, 'div', {'class' : 'section'})
+        p = e.SubElement(sec, 'h3')
+        p.text = f'From the Tech Department'
+        p = e.SubElement(sec, 'p')
+        with open('comments.txt','r') as f:
+            lines = f.readlines()
+        for l in lines:
+            s = e.SubElement(p,'span')
+            s.text = l
+            b = e.SubElement(p,'br')
+
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Weekend in brief'
@@ -712,7 +724,6 @@ def buildWeeklyParkrunReport(region):
                     n.text += f"on their launch "
                 n.text += f"back on the {ordinal(row['PreviousRecordDate'].day)} of {row['PreviousRecordDate'].strftime('%B, %Y')}"
     
-    """
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Kudos to the vollies'
