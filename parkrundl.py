@@ -97,8 +97,8 @@ if __name__ == '__main__':
     if args.event is not None: l.events(args.event, True)
     
     # if no countries/regions/events were explicitly included, include all events from the database
-    if len(l)==0:
-        l.addAll()
+    #if len(l)==0:
+    #    l.addAll()
 
     # if any exclusions, remove them from the list
     if args.exclude_country is not None: l.countries(args.exclude_country, False)
