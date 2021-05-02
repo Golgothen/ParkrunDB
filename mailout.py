@@ -750,7 +750,7 @@ def buildWeeklyParkrunReport(region):
         'P<br>Index'                                         : ['pIndex'],
         'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange'],
         'i&#179;<br>Index'                                   : ['i3','i3Arrow', 'i3Change'],
-        'A.M.E.L<br>Rank'                                    : ['AMELRank','AMELArrow', 'AMELChange']
+        'A.M.E.L<br>Rank'                                    : ['AMELRank','AMELArrow', 'AbsAMELChange']
         }
     
     t = e.SubElement(sec,'table')
@@ -842,7 +842,7 @@ def buildWeeklyParkrunReport(region):
                             s = e.SubElement(p, 'span')
                             s.text = f" achieved {genderPosessive(row['Gender'])} Cowell at "
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                            a.text = row['tmpParkrun']
+                            a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
                             
@@ -862,7 +862,7 @@ def buildWeeklyParkrunReport(region):
                         s = e.SubElement(p, 'span')
                         s.text = f" ran {genderPosessive(row['Gender'])} {row['EventCount']}th parkrun at "
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                        a.text = row['tmpParkrun']
+                        a.text = row['tmp']
                         s = e.SubElement(p, 'span')
                         s.text = "."
                 if j == 'pIndex':
@@ -874,7 +874,7 @@ def buildWeeklyParkrunReport(region):
                         s = e.SubElement(p, 'span')
                         s.text = f" ups {genderPosessive(row['Gender'])} p index to {row['pIndex']} at "
                         a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                        a.text = row['tmpParkrun']
+                        a.text = row['tmp']
                         s = e.SubElement(p, 'span')
                         s.text = "."
                 if j == 'i3':
@@ -887,7 +887,7 @@ def buildWeeklyParkrunReport(region):
                             s = e.SubElement(p, 'span')
                             s.text = f" ups {genderPosessive(row['Gender'])} i&#179 index by {row['i3Change']} to {row['i3']} at "
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                            a.text = row['tmpParkrun']
+                            a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
                 if j in ['wIndex', 'wIndexChange']:
@@ -903,6 +903,7 @@ def buildWeeklyParkrunReport(region):
                             a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
+                """
                 if j in ['AMELRank', 'AMELChange']:
                     if row['AMELChange'] > 0:
                         cls += ' milestone50'
@@ -913,9 +914,10 @@ def buildWeeklyParkrunReport(region):
                             s = e.SubElement(p, 'span')
                             s.text = f" ups {genderPosessive(row['Gender'])} Australian Most Events List ranking by {row['AMELChange']} to {row['AMELRank']} at "
                             a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
-                            a.text = row['tmpParkrun']
+                            a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
+                """
                 if i == 'parkrun':
                     if row['LastRunParkrunThisWeek'] > 0:
                         s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
@@ -1068,7 +1070,7 @@ def buildWeeklyParkrunReport(region):
     addSig(sec)
     
     x = e.tostring(root, pretty_print=True).decode('utf-8').replace('&amp;','&')
-    with open('output.html','w') as f:
+    with open(f'{region}_{date.today().year}{date.today().month}{date.today().day}.html','w') as f:
         f.write(x)
         #lxml.html.open_in_browser(root)    
 
@@ -1237,7 +1239,7 @@ def addSig(body):
     s.text = 'Paul Ellis'
     d = e.SubElement(sig, 'div', {'class' : 'footer'})
     
-def mailoutWeeklyReport():
+def mailoutWeeklyReport(region):
     
     """
     Weekly parkrun report to all subscribers
@@ -1255,7 +1257,7 @@ def mailoutWeeklyReport():
     
     maillist = c.execute('SELECT Email from Subscribers WHERE Subscribed = 1')
     
-    with open('output.html','r') as f:
+    with open(f'{region}_{date.today().year}{date.today().month}{date.today().day}.html','r') as f:
         doc = f.read()
     
     for m in maillist:
@@ -1268,11 +1270,18 @@ def mailoutWeeklyReport():
     
 def part1():
     buildWeeklyParkrunReport('Victoria')
+    buildWeeklyParkrunReport('Queensland')
+    buildWeeklyParkrunReport('New South Wales')
+    buildWeeklyParkrunReport('South Australia')
+    #buildWeeklyParkrunReport('Australian Capital Teritory')
+    #buildWeeklyParkrunReport('Northern Teritory')
+    buildWeeklyParkrunReport('Western Australia')
+    buildWeeklyParkrunReport('Tasmania')
 
 def part2():
     subRegionStatsReport()
     parkrunMilestoneMailout()
-    mailoutWeeklyReport()
+    mailoutWeeklyReport('Victoria')
     
 if __name__ == '__main__':
     part1()
