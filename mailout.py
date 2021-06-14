@@ -379,7 +379,7 @@ def buildVolunteerMilestoneReport(parkrun, node):
                         td.attrib['class'] = cls
     #return root #lxml.html.tostring()
 
-def buildWeeklyParkrunReport(region):
+def buildWeeklyParkrunReport(region, extracols):
     #region = 'Queensland'
     root = e.Element('html', version = '5.0')
     head = e.SubElement(root, 'head')
@@ -748,10 +748,12 @@ def buildWeeklyParkrunReport(region):
         f'{datetime.now().year}<br>Run/New'                  : ['TYEventsDone', 'TYNewEvents'],
         f'{datetime.now().year - 1}<br>Run/New'              : ['LYEventsDone', 'LYNewEvents'],
         'P<br>Index'                                         : ['pIndex'],
-        'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange'],
-        'i&#179;<br>Index'                                   : ['i3','i3Arrow', 'i3Change'],
-        'A.M.E.L<br>Rank'                                    : ['AMELRank','AMELArrow', 'AbsAMELChange']
+        'Wilson<br>Index'                                    : ['wIndex', 'WIndexArrow', 'wIndexChange']
         }
+    if extracols:
+        colgroups.update({'i&#179;<br>Index'                                   : ['i3','i3Arrow', 'i3Change'],
+                          'A.M.E.L<br>Rank'                                    : ['AMELRank','AMELArrow', 'AbsAMELChange']
+                        })
     
     t = e.SubElement(sec,'table')
     for i in colgroups:
@@ -841,7 +843,7 @@ def buildWeeklyParkrunReport(region):
                             a.text = f"{row['FirstName']} {row['LastName']}"
                             s = e.SubElement(p, 'span')
                             s.text = f" achieved {genderPosessive(row['Gender'])} Cowell at "
-                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"{row['LastRunCountryURL']}{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                             a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
@@ -861,7 +863,7 @@ def buildWeeklyParkrunReport(region):
                         a.text = f"{row['FirstName']} {row['LastName']}"
                         s = e.SubElement(p, 'span')
                         s.text = f" ran {genderPosessive(row['Gender'])} {row['EventCount']}th parkrun at "
-                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"{row['LastRunCountryURL']}{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                         a.text = row['tmp']
                         s = e.SubElement(p, 'span')
                         s.text = "."
@@ -873,7 +875,7 @@ def buildWeeklyParkrunReport(region):
                         a.text = f"{row['FirstName']} {row['LastName']}"
                         s = e.SubElement(p, 'span')
                         s.text = f" ups {genderPosessive(row['Gender'])} p index to {row['pIndex']} at "
-                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"{row['LastRunCountryURL']}{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                         a.text = row['tmp']
                         s = e.SubElement(p, 'span')
                         s.text = "."
@@ -886,7 +888,7 @@ def buildWeeklyParkrunReport(region):
                             a.text = f"{row['FirstName']} {row['LastName']}"
                             s = e.SubElement(p, 'span')
                             s.text = f" ups {genderPosessive(row['Gender'])} i&#179 index by {row['i3Change']} to {row['i3']} at "
-                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"{row['LastRunCountryURL']}{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                             a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
@@ -899,7 +901,7 @@ def buildWeeklyParkrunReport(region):
                             a.text = f"{row['FirstName']} {row['LastName']}"
                             s = e.SubElement(p, 'span')
                             s.text = f" ups {genderPosessive(row['Gender'])} Wilson index by {row['wIndexChange']} to {row['wIndex']} at "
-                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            a = e.SubElement(p, 'a', {'class' : 'athlete', 'href' : f"{row['LastRunCountryURL']}{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                             a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
@@ -920,7 +922,7 @@ def buildWeeklyParkrunReport(region):
                 """
                 if i == 'parkrun':
                     if row['LastRunParkrunThisWeek'] > 0:
-                        s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                        s = e.SubElement(td, 'a', {'href' : f"{row['LastRunCountryURL']}{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                         s.text = fstr(row['LastRunParkrun'])
                         if row['EventChange'] > 0:
                             s.attrib['class'] = 'newevent'
@@ -933,7 +935,7 @@ def buildWeeklyParkrunReport(region):
                             if row['LastVolParkrun'] not in vollies:
                                 vollies[row['LastVolParkrun']] = {'URL' : row['LastVolParkrunURL'], 'names' : []}
                             vollies[row['LastVolParkrun']]['names'].append({'FirstName' : row['FirstName'], 'AthleteID' : row['AthleteID']})
-                            s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastVolParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            s = e.SubElement(td, 'a', {'href' : f"{row['LastRunCountryURL']}{row['LastVolParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                             s.text = f"({fstr(row['LastVolParkrun'])})"
                             s.attrib['class'] = 'volunteer'
                     if row['JVolunteerThisWeek'] is not None:
@@ -943,7 +945,7 @@ def buildWeeklyParkrunReport(region):
                             if row['LastVolJParkrun'] not in vollies:
                                 vollies[row['LastVolJParkrun']] = {'URL' : row['LastVolJParkrunURL'], 'names' : []}
                             vollies[row['LastVolJParkrun']]['names'].append({'FirstName' : row['FirstName'], 'AthleteID' : row['AthleteID']})
-                            s = e.SubElement(td, 'a', {'href' : f"https://www.parkrun.com.au/{row['LastVolJParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                            s = e.SubElement(td, 'a', {'href' : f"{row['LastRunCountryURL']}{row['LastVolJParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                             s.text = f"({fstr(row['LastVolJParkrun'])})"
                             s.attrib['class'] = 'volunteer'
                     row['tmp'] = row[j]
@@ -968,7 +970,7 @@ def buildWeeklyParkrunReport(region):
                 s.text = f"{concat(v, vollies[p]['names'])}"
         s = e.SubElement(vollyP, 'span')
         s.text = ' at '
-        s = e.SubElement(vollyP, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/{vollies[p]['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+        s = e.SubElement(vollyP, 'a', {'class' : 'athlete', 'href' : f"{row['LastRunCountryURL']}{vollies[p]['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
         s.text = p
         s = e.SubElement(vollyP, 'span')
         if len(vollies)>1:
@@ -1053,14 +1055,15 @@ def buildWeeklyParkrunReport(region):
     td.text = 'Highest event number completed in order starting at event 1 (a launch).  Completing an event number at any parkrun contributes to this index.'
     tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
     td = e.SubElement(tr,'td')
-    td.text = 'i&#179 index'
-    td = e.SubElement(tr,'td')
-    td.text = 'Highest number of parkruns completed in Australia in launch date order, starting at Main Beach.'
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2 lastrow'})
-    td = e.SubElement(tr,'td')
-    td.text = 'A.M.E.L Rank'
-    td = e.SubElement(tr,'td')
-    td.text = 'Current ranking, and movement of rank from last week, of the Australian Most Events List.'
+    if extracols:
+        td.text = 'i&#179 index'
+        td = e.SubElement(tr,'td')
+        td.text = 'Highest number of parkruns completed in Australia in launch date order, starting at Main Beach.'
+        tr = e.SubElement(tbl,'tr', {'class' : 'altrow2 lastrow'})
+        td = e.SubElement(tr,'td')
+        td.text = 'A.M.E.L Rank'
+        td = e.SubElement(tr,'td')
+        td.text = 'Current ranking, and movement of rank from last week, of the Australian Most Events List.'
     
     
     
@@ -1269,14 +1272,16 @@ def mailoutWeeklyReport(region):
     
     
 def part1():
-    buildWeeklyParkrunReport('Victoria')
-    buildWeeklyParkrunReport('Queensland')
-    buildWeeklyParkrunReport('New South Wales')
-    buildWeeklyParkrunReport('South Australia')
-    #buildWeeklyParkrunReport('Australian Capital Teritory')
-    #buildWeeklyParkrunReport('Northern Teritory')
-    buildWeeklyParkrunReport('Western Australia')
-    buildWeeklyParkrunReport('Tasmania')
+    buildWeeklyParkrunReport('Victoria',True)
+    buildWeeklyParkrunReport('North Island',False)
+    buildWeeklyParkrunReport('South Island',False)
+    #buildWeeklyParkrunReport('Queensland')
+    #buildWeeklyParkrunReport('New South Wales')
+    #buildWeeklyParkrunReport('South Australia')
+    ##buildWeeklyParkrunReport('Australian Capital Teritory')
+    ##buildWeeklyParkrunReport('Northern Teritory')
+    #buildWeeklyParkrunReport('Western Australia')
+    #buildWeeklyParkrunReport('Tasmania')
 
 def part2():
     subRegionStatsReport()
