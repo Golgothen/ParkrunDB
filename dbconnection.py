@@ -239,6 +239,52 @@ class Connection():
         sql += ")" + values + ")"
         #print(sql)
         self.execute(sql)
+
+    def updateParkrunEventPosition(self, position, addAthlete = True):
+        if addAthlete:
+            self.addAthlete(position)
+            
+        test = f"SELECT EventID, AthleteID, Position, GunTime, AgeCategoryID, AgeGrade, Comment FROM EventPositions WHERE EventID = {xstr(position['EventID'])} AND Position = {xstr(position['Pos'])}"
+        existing = self.execute(test)
+        #print(existing)
+        sql = None
+        if len(existing) == 0:  #No record for this position, add a new one
+            sql = "INSERT INTO EventPositions (EventID, AthleteID, Position"
+            values = " VALUES (" + xstr(position['EventID']) + ", " + xstr(position['AthleteID']) + ", " + xstr(position['Pos'])
+    
+            if position['Time'] is not  None:
+                sql += ", GunTime" 
+                values += ", CAST('" + xstr(position['Time']) + "' as time(0))"
+            if position['Age Cat'] is not  None:
+                sql += ", AgeCategoryID" 
+                values += ", " + xstr(self.getAgeCatID(position))
+            if position['Age Grade'] is not  None:
+                sql += ", AgeGrade" 
+                values += ", " + xstr(position['Age Grade'])
+            if position['Note'] is not  None:
+                sql += ", Comment" 
+                values +=  ", '" + position['Note'][:30].replace("'","") + "'"
+            sql += ")" + values + ")"
+        else:
+            existing=existing[0]
+            #print(existing)
+            #print(position)
+            if existing['AthleteID'] != position['AthleteID']:
+                sql = f"UPDATE EventPositions SET AthleteID = {xstr(position['AthleteID'])}"
+        
+                if position['Time'] is not  None:
+                    sql += f", GunTime = CAST('{xstr(position['Time'])}' as time(0))" 
+                if position['Age Cat'] is not  None:
+                    sql += f", AgeCategoryID = {xstr(self.getAgeCatID(position))}" 
+                if position['Age Grade'] is not  None:
+                    sql += f", AgeGrade = {xstr(position['Age Grade'])}" 
+                if position['Note'] is not  None and position['Note'] != 'PB':
+                    sql += ", Comment = '" + position['Note'][:30].replace("'","") + "'" 
+                sql += f" WHERE EventID = {xstr(position['EventID'])} AND Position = {xstr(position['Pos'])}"
+        
+        #print(sql)
+        if sql != None:
+            self.execute(sql)
     
     def updateParkrunURL(self, parkrun, verified, valid):
         self.execute("UPDATE Parkruns SET URLVerified = " + str(int(verified)) + ", URLValid = " + str(int(valid)) + " WHERE ParkrunName = '" + parkrun + "'")
