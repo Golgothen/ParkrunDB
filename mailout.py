@@ -379,7 +379,7 @@ def buildVolunteerMilestoneReport(parkrun, node):
                         td.attrib['class'] = cls
     #return root #lxml.html.tostring()
 
-def buildWeeklyParkrunReport(region, extracols):
+def buildWeeklyParkrunReport(region, listSize, extracols):
     #region = 'Queensland'
     root = e.Element('html', version = '5.0')
     head = e.SubElement(root, 'head')
@@ -392,7 +392,7 @@ def buildWeeklyParkrunReport(region, extracols):
     p = e.SubElement(body, 'p')
     c = Connection(config)
     
-    if path.exists("comments.txt"):
+    if path.exists(f'{region}.txt'):
         sec = e.SubElement(body, 'div', {'class' : 'section'})
         p = e.SubElement(sec, 'h3')
         p.text = f'From the Tech Department'
@@ -666,7 +666,7 @@ def buildWeeklyParkrunReport(region, extracols):
         for row in data:
             ownrecord = False
             li = e.SubElement(l, 'li')
-            s = e.SubElement(li, 'a', {'class' : 'parkrunname', 'href' : f"https://www.parkrun.com.au/{row['URL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+            s = e.SubElement(li, 'a', {'class' : 'parkrunname', 'href' : f"{row['CountryURL']}{row['URL']}{results['LatestResultsURL']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
             s.text = row['ParkrunName']
             s = e.SubElement(li, 'span')
             s.text = ': '
@@ -693,6 +693,47 @@ def buildWeeklyParkrunReport(region, extracols):
                 s.text += f", setting {genderObjective(row['Gender'])}self a new PB,"
             s.text += f" running {formattime(row['GunTime'])}."
     
+    data = c.execute(f"select * from qryParkrunRecordsBrokenThisWeekByAgeCategory where Region = '{region}' order by ParkrunName")    
+    d = e.SubElement(sec, 'div')
+    p = e.SubElement(d, 'p')
+    if len(data) == 0:
+        p.text = 'There were no age category records broken this week.'
+    else:
+        if len(data) == 1:
+            p.text = f'There was just one age category record broken this week:'
+        else:
+            p.text = f'There were {len(data)} age category records broken this week:'
+        l = e.SubElement(d, 'ul')
+        for row in data:
+            ownrecord = False
+            li = e.SubElement(l, 'li')
+            s = e.SubElement(li, 'a', {'class' : 'parkrunname', 'href' : f"{row['CountryURL']}{row['URL']}{results['LatestResultsURL']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+            s.text = row['ParkrunName']
+            s = e.SubElement(li, 'span')
+            s.text = ': '
+            n = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['AthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+            n.text = f"{row['FirstName']} {row['LastName']} "
+            rd = guntimedelta(row['PreviousRecord'], row['GunTime']).seconds
+            s =  e.SubElement(li, 'span')
+            if rd > 60:
+                s.text = 'smashed'
+            elif 20 < rd <= 60:
+                s.text = 'broke'
+            else:
+                s.text = 'took'
+            if row['FirstName'] == row['PreviousRecordHolderFirstName'] and row['LastName'] == row['PreviousRecordHolderLastName']:
+                s.text += f" {genderPosessive(row['Gender'])} own record"
+                ownrecord = True
+            else:
+                n = e.SubElement(li, 'a', {'class' : 'athlete', 'href' : f"https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={row['PreviousRecordHolderAthleteID']}", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
+                n.text = f"{row['PreviousRecordHolderFirstName']} {row['PreviousRecordHolderLastName']}"
+                s =  e.SubElement(li, 'span')
+                s.text = f"'s record "
+            s.text += f" by {guntimedelta(row['PreviousRecord'], row['GunTime']).seconds} seconds"
+            if row['Comment'] == 'New PB!' and not ownrecord:
+                s.text += f", setting {genderObjective(row['Gender'])}self a new PB,"
+            s.text += f" running {formattime(row['GunTime'])}."
+
     data = c.execute(f"select * from qryEventRecordsBrokenThisWeek WHERE Region = '{region}'")
     d = e.SubElement(sec, 'div')
     p = e.SubElement(d, 'p')
@@ -731,8 +772,8 @@ def buildWeeklyParkrunReport(region, extracols):
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
-    p.text = f'Statesmanship Top 100'
-    data = c.execute(f"SELECT * FROM getStatesmanReport(100, '{region}') ORDER BY Rank, TQTY DESC")
+    p.text = f'{region} Statesmanship Top {listSize}'
+    data = c.execute(f"SELECT * FROM getStatesmanReport({listSize}, '{region}') ORDER BY Rank, Weeks DESC, TQTY DESC")
     #data = c.execute(f"SELECT * FROM temptable ORDER BY Rank, TQTY DESC")
     
     vollies = {}
@@ -1258,7 +1299,7 @@ def mailoutWeeklyReport(region):
     
     service = gMail.auth()
     
-    maillist = c.execute('SELECT Email from Subscribers WHERE Subscribed = 1')
+    maillist = c.execute(f'SELECT Email from Subscribers WHERE Subscribed = 1 and RegionID = getRegionID = {region}')
     
     with open(f'{region}_{date.today().year}{date.today().month}{date.today().day}.html','r') as f:
         doc = f.read()
@@ -1272,9 +1313,9 @@ def mailoutWeeklyReport(region):
     
     
 def part1():
-    buildWeeklyParkrunReport('Victoria',True)
-    buildWeeklyParkrunReport('North Island',False)
-    buildWeeklyParkrunReport('South Island',False)
+    buildWeeklyParkrunReport('Victoria', 100, True)
+    buildWeeklyParkrunReport('New Zealand', 100, False)
+    #buildWeeklyParkrunReport('South Island', False)
     #buildWeeklyParkrunReport('Queensland')
     #buildWeeklyParkrunReport('New South Wales')
     #buildWeeklyParkrunReport('South Australia')
@@ -1287,6 +1328,7 @@ def part2():
     subRegionStatsReport()
     parkrunMilestoneMailout()
     mailoutWeeklyReport('Victoria')
+    mailoutWeeklyReport('New Zealand')
     
 if __name__ == '__main__':
     part1()
