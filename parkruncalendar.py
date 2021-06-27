@@ -35,55 +35,12 @@ def getURL(url):
     logger.debug('URL returned string of length {}'.format(len(temp)))
     return temp 
 
-if __name__ == '__main__':
-
-    loggingQueue = multiprocessing.Queue()
-    
-    listener = LogListener(loggingQueue)
-    listener.start()
-    
-    config = sender_config
-    config['handlers']['queue']['queue'] = loggingQueue
-    logging.config.dictConfig(config)
-    logger = logging.getLogger('parkruncalendar')
-    
-    c = Connection(config)
-    #logger.debug("Reading Parkrun Calendar")
-    #table = lxml.html.fromstring(getURL(calendarURL)).xpath('/html/body/section[1]/div/div[1]/div[1]/div/div[4]')[0]
-    #logger.debug("Parkrun Calendar read")
-    lists = {}
-    
-    #for e in table:
-    #    if e.tag == 'h3':
-    #        currentlist = e.getchildren()[0].text
-    #        if currentlist == 'Cancellations': currentlist = 'Cancellation'
-    #        if currentlist == 'Anniversaries': currentlist = 'Anniversary'
-    #        if currentlist == 'Launches': currentlist = 'Launch'
-    #        lists[currentlist] = []
-    #        if currentlist == 'Cancellation':
-    #            logger.debug("Launches and Anniversaries processed")
-    #            break
-    #    if e.tag == 'p':
-    #        if len(e.getchildren()) > 0:
-    #            if e.getchildren()[0].tag == 'span':
-    #                currentmonth = e.getchildren()[0].getchildren()[0].text
-    #            if e.getchildren()[0].tag in ['strong', 'b']:
-    #                if len(e.getchildren()[0].getchildren()) > 0:
-    #                    currentmonth = e.getchildren()[0].getchildren()[0].text
-    #                else:
-    #                    currentdate = e.getchildren()[0].text[:-2]
-    #            if e.getchildren()[0].tag == 'a':
-    #                event = e.getchildren()[0].text.split(' (')[0]
-    #                lists[currentlist].append( ( (datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')), event, '' ) )
-    #        else:
-    #            #print( list(map(str.strip, e.text.replace('\xa0','').split(','))))
-    #            for x in [x.split('(')[0].strip() for x in list(map(str.strip, e.text.replace('\xa0','').split(',')))]:
-    #                lists[currentlist].append( ( (datetime.strptime('{} {} {}'.format(currentmonth, currentdate, datetime.now().year),'%B %d %Y')), (x), '' ) )
-    #
-    logger.debug("Reading Parkrun Cancellations")
-    table = lxml.html.fromstring(getURL('https://www.parkrun.com.au/cancellations/')).xpath('//*[@id="content"]/div[1]')[0]
+def readCancellations(URL):
+    table = lxml.html.fromstring(getURL()).xpath('//*[@id="content"]/div[1]')[0]
     logger.debug("Parkrun Cancellations read")
     
+    c = Connection(config)
+    lists = {}
     ulcount = 0
     licount = 0
     lists['Cancellation'] = []
@@ -117,3 +74,22 @@ if __name__ == '__main__':
     logger.info("Database updated. {} records added.".format(count))
     print("Database updated. {} records added.".format(count))
     listener.stop()
+
+if __name__ == '__main__':
+
+    loggingQueue = multiprocessing.Queue()
+    
+    listener = LogListener(loggingQueue)
+    listener.start()
+    
+    config = sender_config
+    config['handlers']['queue']['queue'] = loggingQueue
+    logging.config.dictConfig(config)
+    logger = logging.getLogger('parkruncalendar')
+    
+    
+    logger.debug("Reading Australian Parkrun Cancellations")
+    readCancellations('https://www.parkrun.com.au/cancellations/')
+    logger.debug("Reading Australian Parkrun Cancellations")
+    readCancellations('https://www.parkrun.co.nz/cancellations/')
+    
