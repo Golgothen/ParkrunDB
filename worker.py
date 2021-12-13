@@ -102,7 +102,8 @@ class Worker(multiprocessing.Process):
                             #if not, delete the old event record and re-import the data
                             self.logger.info('Parkrun {} event {}: runners did not match - reimporting.'.format(parkrun['EventURL'], row['EventNumber']))
                             self.msgQ.put(Message('Process', self.id, 'Updating ' + row['Name'] + ' event ' + xstr(row['EventNumber'])))
-                            eventID = c.addParkrunEvent(row)
+                            eventID = c.replaceParkrunEvent(row)
+                            self.logger.debug(f'EventID is {eventID}')
                             eData = self.getEvent(parkrun['URL'] + parkrun['EventNumberURL'], row['EventNumber'])
                             if eData is not None:
                                 runnersAdded = True
@@ -213,7 +214,7 @@ class Worker(multiprocessing.Process):
                             d['LastName'] = lastName.strip()
                         else:
                             d['LastName'] = ''
-                        d['AthleteID'] = int(v[0][0].get('href').split('=')[1])
+                        d['AthleteID'] = int(v[0][0].get('href').split('/')[5])
                     else:
                         # Unknown Athlete
                         d['FirstName'] = 'Unknown'
@@ -236,7 +237,10 @@ class Worker(multiprocessing.Process):
                         # 30/10/19 - Age Category and Age Grade are now in the same cell
                         d['Age Cat'] = v[0][0].text
                         if len(v.getchildren()) > 1:
-                            d['Age Grade'] = float(v[1].text.split('%')[0])
+                            try:
+                                d['Age Grade'] = float(v[1].text.split('%')[0])
+                            except:
+                                d['Age Grade'] = None
                         else:
                             d['Age Grade'] = None
                     else:
@@ -438,7 +442,7 @@ class Worker(multiprocessing.Process):
                     retry = 0
                     athletepage = None
                     while not found and retry < 3:
-                        athletepage = self.getURL('https://www.parkrun.com.au/results/athleteresultshistory/?athleteNumber={}'.format(v['AthleteID']))
+                        athletepage = self.getURL('https://www.parkrun.com.au/parkrunner/{}/'.format(v['AthleteID']))
                         if athletepage is not None:
                             found = True
                         else:
@@ -461,10 +465,10 @@ class Worker(multiprocessing.Process):
                         self.logger.debug('Sleeping {} seconds...'.format(self.delay))
                         sleep(self.delay)
                 if table is not None:
-                    for r in table.getchildren():
-                        if int(r.getchildren()[0].text) == date.year:
-                            v['Volunteer'][r.getchildren()[1].text] = int(r.getchildren()[2].text)
-                    athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummaryByYear WHERE AthleteID = {} AND Year = {}".format(v['AthleteID'], date.year))
+                    for r in table:
+                        #if int(r.getchildren()[0].text) == date.year:
+                            v['Volunteer'][r[0].text.strip()] = int(r[1].text)
+                    athletevol = c.execute("SELECT * FROM qryAthleteVolunteerSummary WHERE AthleteID = {}".format(v['AthleteID']))
                     if len(athletevol) > 0:
                         for al in athletevol:
                             if al['VolunteerPosition'] in v['Volunteer']:
