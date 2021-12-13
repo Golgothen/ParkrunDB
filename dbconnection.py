@@ -7,7 +7,7 @@ class Connection():
 
         server = 'localhost'
         database = 'Parkrun'
-        userstring = 'Trusted_Connection=yes'
+        userstring = 'Trusted_Connection=yes' #;MARS_Connection=Yes'
         driver = 'SQL Server Native Client 11.0'
         self.connectString = 'DRIVER='+driver+';SERVER='+server+';DATABASE='+database+';'+userstring
         pyodbc.pooling = False
@@ -120,10 +120,11 @@ class Connection():
 
     def replaceParkrunEvent(self, row):
         EventID = self.execute("SELECT dbo.getEventID('{}', {})".format(row['EventURL'], row['EventNumber']))
+        self.logger.debug(row)
         if EventID is not None:
             self.execute("DELETE FROM EventPositions WHERE EventID = {}".format(EventID))
-            #self.execute("DELETE FROM Events WHERE EventID = {}".format(EventID))
-        #return self.execute("INSERT INTO Events (ParkrunID, EventNumber, EventDate) VALUES (" + str(self.getParkrunID(row['EventURL'])) + ", " + str(row['EventNumber']) + ", CAST('" + row['EventDate'].strftime('%Y-%m-%d') + "' AS date))")
+        else:
+            EventID = self.addParkrunEvent(row)
         return EventID
 
     def checkParkrunEvent(self, row):
