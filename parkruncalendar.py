@@ -5,6 +5,7 @@ from dbconnection import Connection
 from mplogger import *
 import multiprocessing
 from datetime import datetime
+from time import sleep
 import pyodbc
 
 calendarURL = 'https://email.parkrun.com/t/i-l-pthlkg-ntrktsur-m/'
@@ -36,7 +37,7 @@ def getURL(url):
     return temp 
 
 def readCancellations(URL):
-    table = lxml.html.fromstring(getURL()).xpath('//*[@id="content"]/div[1]')[0]
+    table = lxml.html.fromstring(getURL(URL)).xpath('//*[@id="content"]/div[1]')[0]
     logger.debug("Parkrun Cancellations read")
     
     c = Connection(config)
@@ -46,17 +47,23 @@ def readCancellations(URL):
     lists['Cancellation'] = []
     for e in table:
         if e.tag == 'h1':
-            if len(e.getchildren()) == 0:
+            if len(e) == 0:
                 currentdate = datetime.strptime(e.text,'%Y-%m-%d')
         if e.tag == 'ul':
-            ulcount += 1
-            licount = 0
-            if len(e.getchildren()) > 1:
-                for li in e.getchildren():
-                    licount += 1
-                    lists['Cancellation'].append((currentdate,li.getchildren()[0].text[:-8],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li[{}]/text()'.format(ulcount,licount))[0].split(':')[1].strip().replace("'","''")))
-            else:
-                lists['Cancellation'].append((currentdate,e.getchildren()[0].getchildren()[0].text[:-8],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li/text()'.format(ulcount))[0].split(':')[1].strip().replace("'","''")))
+            try:
+                ulcount += 1
+                licount = 0
+                if len(e) == 0:
+                    continue
+                if len(e) > 1:
+                    for li in e:
+                        licount += 1
+                        lists['Cancellation'].append((currentdate, li[0].get('href').split('/')[3],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li[{}]/text()'.format(ulcount,licount))[0].split(':')[1].strip().replace("'","''")))
+                else:
+                    lists['Cancellation'].append((currentdate, e[0].get('href').split('/')[3],table.xpath('//*[@id="content"]/div[1]/ul[{}]/li/text()'.format(ulcount))[0].split(':')[1].strip().replace("'","''")))
+            except:
+                logger.info(f'Error interpreting list {ulcount}, item {licount}')
+                continue
             
     
     logger.debug("Parkrun Cancellations processed")
@@ -73,7 +80,6 @@ def readCancellations(URL):
                     
     logger.info("Database updated. {} records added.".format(count))
     print("Database updated. {} records added.".format(count))
-    listener.stop()
 
 if __name__ == '__main__':
 
@@ -90,6 +96,17 @@ if __name__ == '__main__':
     
     logger.debug("Reading Australian Parkrun Cancellations")
     readCancellations('https://www.parkrun.com.au/cancellations/')
-    logger.debug("Reading Australian Parkrun Cancellations")
+    sleep(8)
+    logger.debug("Reading New Zealand Parkrun Cancellations")
     readCancellations('https://www.parkrun.co.nz/cancellations/')
+    sleep(8)
+    logger.debug("Reading United Kingdom Parkrun Cancellations")
+    readCancellations('https://www.parkrun.org.uk/cancellations/')
+    sleep(8)
+    logger.debug("Reading Ireland Parkrun Cancellations")
+    readCancellations('https://www.parkrun.ie/cancellations/')
+    sleep(8)
+    logger.debug("Reading South Africa Parkrun Cancellations")
+    readCancellations('https://www.parkrun.co.za/cancellations/')
+    listener.stop()
     
