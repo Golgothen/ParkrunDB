@@ -11,6 +11,18 @@ from worker import *
 import logging, logging.config, multiprocessing, lxml.html, argparse, requests
 from requests.exceptions import HTTPError
 
+#"""
+loggingQueue = multiprocessing.Queue()
+
+listener = LogListener(loggingQueue)
+#listener.start()
+
+config = sender_config
+config['handlers']['queue']['queue'] = loggingQueue
+logging.config.dictConfig(config)
+logger = logging.getLogger('checkhistory')
+#"""
+
 intervals = (
     ('weeks', 604800),  # 60 * 60 * 24 * 7
     ('days', 86400),    # 60 * 60 * 24
@@ -21,7 +33,7 @@ intervals = (
 
 def display_time(seconds, granularity=2):
     result = []
-
+    
     for name, count in intervals:
         value = seconds // count
         if value:
@@ -193,10 +205,11 @@ def getEventTable(root):
         return None
 
 
-if __name__ == '__main__':
-    
+#if __name__ == '__main__':
+def run():
+    """    
     loggingQueue = multiprocessing.Queue()
-
+    
     listener = LogListener(loggingQueue)
     listener.start()
     
@@ -204,12 +217,13 @@ if __name__ == '__main__':
     config['handlers']['queue']['queue'] = loggingQueue
     logging.config.dictConfig(config)
     logger = logging.getLogger('checkhistory')
-
+    """
+    listener.start()
     c = Connection(config)
-
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--limit', type = int, default = 40, help = 'Specify number of events and athlete needs to have completed to be selected.')
-    parser.add_argument('--delay', type = int, default = 5, help = 'Wait n seconds before processing the next athlete')
+    parser.add_argument('--delay', type = int, default = 10, help = 'Wait n seconds before processing the next athlete')
     
     args = parser.parse_args()
     
@@ -236,23 +250,23 @@ if __name__ == '__main__':
             tick = timer()
             while not outQ.empty():
                 logger.debug(outQ.get(False))
-            athlete['EventCount'] = c.execute("SELECT dbo.getAthleteEventCount({})".format(athlete['AthleteID']))
-            logger.debug("Checking ID {}, {} {} ({})".format(athlete['AthleteID'], athlete['FirstName'], athlete['LastName'], athlete['EventCount']))
+            #athlete['EventCount'] = c.execute(f"SELECT dbo.getAthleteEventCount({athlete['AthleteID']})")
+            logger.info(f"Checking ID {athlete['AthleteID']}, {athlete['FirstName']} {athlete['LastName']} ({athlete['EventCount']})")
             html = getURL(baseURL.format(athlete['AthleteID']))
             try:
                 runcount = int(html.xpath('//*[@id="content"]/h2/text()[1]')[0].split(' runs at All Events')[0].split(' ')[-1])
-                logger.debug("Website says Runcount = {}".format(runcount))
+                logger.info(f"Website says Runcount = {runcount}")
             except (ValueError, IndexError, AttributeError):
-                print("Error reading run count for Athlete {}".format(athlete['AthleteID']))
-                logger.warning("Error reading run count for Athlete {}".format(athlete['AthleteID']))
+                print(f"Error reading run count for Athlete {athlete['AthleteID']}")
+                logger.warning(f"Error reading run count for Athlete {athlete['AthleteID']}")
                 continue
             if athlete['EventCount'] != runcount:
                 eventsMissing = runcount - athlete['EventCount']
                 table = html.xpath('//*[@id="results"]')[0]
                 rows = table.xpath('//tbody/tr')
-                hist_data = c.execute("SELECT * FROM getAthleteEventHistory({})".format(athlete['AthleteID']))
+                hist_data = c.execute(f"SELECT * FROM getAthleteEventHistory({athlete['AthleteID']})")
                 if eventsMissing > 0:
-                    logger.debug("Athlete {} Missing {} runs".format(athlete['AthleteID'], eventsMissing))
+                    logger.info(f"Athlete {athlete['AthleteID']} Missing {eventsMissing} runs")
                     for row in rows:  # Iterate through the events in the summary table
                         if len(row) < 7:
                             continue
@@ -277,8 +291,8 @@ if __name__ == '__main__':
                                 position['Age Grade'] = None
                             position['Note'] = None
                         except TypeError:
-                            print("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['EventURL'], parkrun['EventNumber'], athlete['AthleteID']))
-                            logger.warning("Error reading parkrun data {}, {} for Athlete {}".format(parkrun['EventURL'], parkrun['EventNumber'], athlete['AthleteID']))
+                            print(f"Error reading parkrun data {parkrun['EventURL']}, {parkrun['EventNumber']} for Athlete {athlete['AthleteID']}")
+                            logger.warning(f"Error reading parkrun data {parkrun['EventURL']}, {parkrun['EventNumber']} for Athlete {athlete['AthleteID']}")
                             continue
                         #logger.debug(parkrun)
                         #logger.debug(position)
@@ -288,11 +302,12 @@ if __name__ == '__main__':
                                 found = True
                                 break
                         if not found:
-                            logger.debug("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
+                            logger.info("Missed event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
                             parkrunType = c.execute("SELECT dbo.getParkrunType('{}')".format(parkrun['EventURL']))
+                            position['EventID'] = c.execute("SELECT dbo.getEventID('{}',{})".format(parkrun['EventURL'], parkrun['EventNumber']))
+                            #TODO: Add code to collect a specific event number
                             if parkrunType == 'Special':
                                 logger.debug("Special Event detected")
-                                position['EventID'] = c.execute("SELECT dbo.getEventID('{}',{})".format(parkrun['EventURL'], parkrun['EventNumber']))
                                 if position['EventID'] is None:
                                     position['EventID'] = c.addParkrunEvent(parkrun)
                                 c.addParkrunEventPosition(position, False)
@@ -300,11 +315,13 @@ if __name__ == '__main__':
                                 eventURL = c.execute("SELECT dbo.getEventURL('{}')".format(parkrun['EventURL']))
                                 if eventURL is not None:
                                     event_data = getEvent(eventURL, parkrun['EventNumber'])
-                                    eventID = c.replaceParkrunEvent({'EventURL': parkrun['EventURL'], 'EventNumber': parkrun['EventNumber'], 'EventDate': parkrun['EventDate']})
+                                    #eventID = c.replaceParkrunEvent({'EventURL': parkrun['EventURL'], 'EventNumber': parkrun['EventNumber'], 'EventDate': parkrun['EventDate']})
                                     if event_data is not None:
                                         for edata in event_data:
-                                            edata['EventID'] = eventID
-                                            c.addParkrunEventPosition(edata)
+                                            edata['EventID'] = position['EventID']
+                                            #c.updateParkrunEventPosition(edata)
+                                            logger.debug(f"Halting with {edata}")
+                                            exit()
                                         logger.debug("Reloaded event {} for parkrun {}".format(parkrun['EventNumber'], parkrun['EventURL']))
                                         sleep(10)
                                         eventsMissing -= 1 
@@ -327,7 +344,7 @@ if __name__ == '__main__':
                                     else:
                                         continue
                     if eventsMissing == 0:
-                        #c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
+                        c.execute("UPDATE Athletes SET HistoryLastChecked = GETDATE() WHERE AthleteID = " + str(athlete['AthleteID']))
                         logger.info("Athlete {} {}, {} run count OK.".format(athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
                 else:
                     # Event has been deleted from athlete history.  Find out which one
@@ -340,14 +357,17 @@ if __name__ == '__main__':
                                d['EventNumber'] == int(row[2][0].get('href').split('=')[1]):
                                 found = True
                                 break
+                            #position['EventID'] = c.execute("SELECT dbo.getEventID('{}',{})".format(d['URL'], d['EventNumber']))
                         if not found:
-                            logger.debug("Deleted event {} for parkrun {} for athlete {} {} ({})".format(d['EventNumber'], d['ParkrunName'],athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
+                            logger.info("Deleted event {} for parkrun {} for athlete {} {} ({})".format(d['EventNumber'], d['ParkrunName'],athlete['FirstName'], athlete['LastName'], athlete['AthleteID']))
                             event_data = getEvent(c.execute("SELECT dbo.getEventURL('{}')".format(d['URL'])),d['EventNumber'])
-                            eventID = c.replaceParkrunEvent({'EventURL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
+                            #eventID = c.replaceParkrunEvent({'EventURL': d['URL'], 'EventNumber': d['EventNumber'], 'EventDate': d['EventDate']})
                             if event_data is not None:
                                 for edata in event_data:
-                                    edata['EventID'] = eventID
-                                    c.addParkrunEventPosition(edata)
+                                    edata['EventID'] = position['EventID']
+                                    #c.updateParkrunEventPosition(edata)
+                                    logger.debug("Halting")
+                                    exit()
                                 logger.debug("Reloaded event {} for parkrun {}".format(d['EventNumber'], d['URL']))
                                 eventsMissing += 1
                             sleep(delay)
@@ -360,16 +380,15 @@ if __name__ == '__main__':
             counter += 1
             if counter % 10 == 0:
                 rate = (counter / ((timer() - start)/60))
-                stats = c.execute("SELECT * FROM getAthleteCheckProgress({})".format(limit))[0]
-                print('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete, {:4.1f} athletes/minute, ETC in {} '.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete'],rate, display_time(int((stats['AthleteCount']-stats['CheckedAthlete'])/rate*60))))
+                #stats = c.execute("SELECT * FROM getAthleteCheckProgress({})".format(limit))[0]
+                #print('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete, {:4.1f} athletes/minute, ETC in {} '.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete'],rate, display_time(int((stats['AthleteCount']-stats['CheckedAthlete'])/rate*60))))
+                print(f"{len(data)} athletes selected, {counter} athletes processed")
                 #logger.debug('{:8,.0f} athletes meet criteria, {:8,.0f} athletes checked, {:8,.0f} athletes remain, {:7,.4f}% complete.'.format(stats['AthleteCount'],stats['CheckedAthlete'],stats['AthleteCount']-stats['CheckedAthlete'],stats['PercentComplete']))
                 #print('{} events pending download.'.format(inQ.qsize()))
                 logger.debug('{} events pending download.'.format(inQ.qsize()))
                 counter = 0
                 start = timer()
-            t = delay - (timer() - tick)
-            if t > 0:
-                sleep(t)
+            sleep(delay)
         inQ.put(None)
         worker.join()
         while not outQ.empty():

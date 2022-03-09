@@ -56,7 +56,7 @@ def str2bool(v):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--processes', type = int, default = 2, help = 'Specify number of worker processes. Default is number of system cores.')
+    parser.add_argument('--processes', type = int, default = 1, help = 'Specify number of worker processes. Default is number of system cores.')
     parser.add_argument('--country', nargs = '+',  help = 'Specify country/ies to import. Surround the name with double quotes if it contains a space. Seperate multiple countries with spaces.')
     parser.add_argument('--region', nargs = '+',  help = 'Specify region/s to import. Surround the name with double quotes if it contains a space. Seperate multiple regions with spaces.')
     parser.add_argument('--event', nargs = '+',  help = 'Specify event/s to import. Surround the name with double quotes if it contains a space. Seperate multiple events with spaces.')
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--exclude_region', nargs = '+',  help = 'Specify region/s to exclude from import. Surround the name with double quotes if it contains a space. Seperate multiple regions with spaces.')
     parser.add_argument('--exclude_event', nargs = '+',  help = 'Specify event/s to exclude from import. Surround the name with double quotes if it contains a space. Seperate multiple events with spaces.')
     parser.add_argument('--mode', nargs = 1, default = ['Normal'], help = 'Valid modes are Normal, CheckURLs or NewEvents')
-    parser.add_argument('--delay', type = int, default = 10, help = 'Wait n seconds before processing the next event')
+    parser.add_argument('--delay', type = int, default = 8, help = 'Wait n seconds before processing the next event')
     parser.add_argument('--year', type = int, default = 0, help = 'Download results only for a specific year. Default is all, Has no effect when --MODE is NEWEVENTS')
     parser.add_argument('--inactive', type = str2bool, nargs = '?', default = False, help = 'Specify if inactive parkruns should be included. Default is False.')
     parser.add_argument('--volunteer', type = str2bool, nargs = '?', default = False, help = 'Specify if volunteer information should be included. Default is False.')
