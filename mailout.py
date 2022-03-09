@@ -1281,6 +1281,7 @@ def parkrunMilestoneMailout():
     listener.stop()
     
 def addSig(body):
+
     sig = e.SubElement(body, 'div')
     
     d = e.SubElement(sig, 'div', {'class' : 'name'})
