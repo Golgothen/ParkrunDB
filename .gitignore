@@ -5,7 +5,6 @@ __pycache__/
 *.log
 /.pydevproject
 /.project
-*.log
 *.html
 /Parkrun_fe_Backup.accdb
 /Parkrun_fe.laccdb

@@ -263,6 +263,9 @@ class Worker(multiprocessing.Process):
                     
                     # 30/11/19 - Note is now inside the Time cell
                     d['Note'] = v[1][0].text
+                    #self.logger.debug(len(v[1]))
+                    #if len(v) > 1:
+                    #    d['Note'] += ' ' + v[1][1].text
             results.append(d)
         if len(results) > 0:
             if 'Pos' not in results[0].keys():

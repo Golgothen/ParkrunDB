@@ -425,9 +425,9 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
         s.text = ''
         for row in data:
             s.text += f"{row['ParkrunName']}{concat(row,data)}"
-        s.text +=  " were the only "
+        s.text +=  " were "
         a = e.SubElement(p, 'a', {'href' : f"{data[0]['CountryURL']}cancellations/", 'target' : '_blank', 'rel' : 'noopener noreferrer', 'class' : 'parkrunname'})
-        a.text = 'cancellations'
+        a.text = 'cancelled'
 
     data = c.execute(f"select ParkrunName, URL, CountryURL from getParkrunNoResults('{region}') order by ParkrunName")
     s = e.SubElement(p, 'span')
@@ -567,7 +567,7 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
         s.text += '.'
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
-    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'F' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
+    data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.FirstTimer, q.NewPB from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'F' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
     if len(data)>0:
         p = e.SubElement(sec, 'h3')
         p.text = f'The fastest among us'
@@ -581,15 +581,14 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
             s.text = f"{row['Athlete']}"
             s = e.SubElement(li, 'span')
             s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
-            if row['Comment'] not in [None, 'PB']:
-                if row['Comment'] == 'New PB!':
-                    s.text += f" setting herself a new PB"
-                else:
-                    s.text += ' for the first time'
+            if row['NewPB'] != 0:
+                s.text += f" setting herself a new PB"
+            if row['FirstTimer'] != 0:
+                s.text += ' for the first time'
             s.text += '.'
         
     if len(data)>0:
-        data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.Comment from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'M' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
+        data = c.execute(f"select * from (select Rank() OVER (partition by q.AgeCategory order by q.guntime asc) as Rank, q.AthleteID, q.Athlete, q.ParkrunName, q.GunTime, q.AgeCategory, q.FirstTimer, q.NewPB from qryParkrunThisWeekFastestAthlete as q where q.Gender = 'M' and q.Region = '{region}') x where x.Rank = 1 order by x.GunTime asc")
         d = e.SubElement(sec, 'div')
         p = e.SubElement(d, 'p')
         p.text = f"The {len(data)} fastest males in {region} by age category, in pace order, were:"
@@ -600,11 +599,10 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
             s.text = f"{row['Athlete']}"
             s = e.SubElement(li, 'span')
             s.text = f" ({row['AgeCategory']}) running {row['ParkrunName']} in {formattime(row['GunTime'])}"
-            if row['Comment'] not in [None, 'PB']:
-                if row['Comment'] == 'New PB!':
-                    s.text += f" setting himself a new PB"
-                else:
-                    s.text += ' for the first time'
+            if row['NewPB'] != 0:
+                s.text += f" setting himself a new PB"
+            if row['FirstTimer'] != 0:
+                s.text += ' for the first time'
             s.text += '.'
     
     sec = e.SubElement(body, 'div', {'class' : 'section'})
@@ -691,7 +689,7 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
                 s =  e.SubElement(li, 'span')
                 s.text = f"'s record "
             s.text += f" by {guntimedelta(row['OldRecordGunTime'], row['NewRecordGunTime']).seconds} seconds"
-            if row['Comment'] == 'New PB!' and not ownrecord:
+            if row['NewPB'] != 0 and not ownrecord:
                 s.text += f", setting {genderObjective(row['Gender'])}self a new PB,"
             s.text += f" running {formattime(row['NewRecordGunTime'])}."
     
@@ -732,7 +730,7 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
                 s =  e.SubElement(li, 'span')
                 s.text = f"'s record "
             s.text += f" by {guntimedelta(row['OldRecordGunTime'], row['NewRecordGunTime']).seconds} seconds"
-            if row['Comment'] == 'New PB!' and not ownrecord:
+            if row['NewPB'] != 0 and not ownrecord:
                 s.text += f", setting {genderObjective(row['Gender'])}self a new PB,"
             s.text += f" running {formattime(row['NewRecordGunTime'])}."
 
@@ -775,14 +773,15 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'{region} Statesmanship Top {listSize}'
-    data = c.execute(f"SELECT * FROM getStatesmanReport({listSize}, '{region}') ORDER BY Rank, Weeks DESC, TQTY DESC")
+    #data = c.execute(f"SELECT * FROM getStatesmanReport({listSize}, '{region}') ORDER BY Rank, Weeks DESC, TQTY DESC")
+    data = c.execute(f"SELECT * FROM getStatesmanReport({listSize}, '{region}') ORDER BY Rank, TQTY DESC")
     #data = c.execute(f"SELECT * FROM temptable ORDER BY Rank, TQTY DESC")
     
     vollies = {}
     
     colgroups = {
         'Rank'                                               : ['Rank', 'RankArrow', 'AbsRankChange'],
-        'Weeks<br>Held'                                      : ['Weeks'],
+        #'Weeks<br>Held'                                      : ['Weeks'],
         'Athlete'                                            : ['AthleteName'],
         'parkrun'                                            : ['LastRunParkrun'],
         'Events<br>Local/Total'                              : ['TotalEvents', 'DifferentEvents'],
@@ -1265,6 +1264,8 @@ def parkrunMilestoneMailout():
         h.text = f"Upcoming volunteer milestones for {m['ParkrunName']} parkrun"
         buildVolunteerMilestoneReport(m['ParkrunName'], sec)
         sec = e.SubElement(body, 'div', {'class' : 'section'})
+        p = e.SubElement(sec, 'p')
+        p.text = "To all event teams, the report has been updated to include unofficial milestones, as many athletes celebrate them.  If you don't want these on the report then please let me know."
         p = e.SubElement(sec, 'p')
         p.text = "This email is automatically generated.  If you believe any of this information to be incorrect then please let me know by replying to this email address."
         p = e.SubElement(sec, 'p')

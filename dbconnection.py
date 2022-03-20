@@ -1,4 +1,5 @@
 import pyodbc, logging, logging.config
+from datetime import datetime
 
 xstr = lambda s: 'NULL' if s is None else str(s)
 
@@ -235,10 +236,37 @@ class Connection():
             sql += ", AgeGrade" 
             values += ", " + xstr(position['Age Grade'])
         if position['Note'] is not  None:
-            sql += ", Comment" 
-            values +=  ", '" + position['Note'][:30].replace("'","") + "'"
+            # First Timer and New PB messages can't be relied on in multilingual
+            # Determine if this is a first timer
+            
+            # See if there is a tome in the message (this is the PB remains at message)
+            """
+            try:
+                self.logger.debug(position['Note'])
+                validTime = datetime.strptime(position['Note'][-5:],'%M:%S')
+                # A time was found, so ignore the message
+                pass
+            except:
+                # No time was found so it's either a PB or First Time
+                # Test for first time at the parkrun
+            """
+            data = self.execute(f"SELECT ParkrunID, EventDate from Events WHERE EventID = {xstr(position['EventID'])}")[0]
+            parkrunID = data['ParkrunID']
+            eventDate = data['EventDate']  
+            
+            firstTime = self.execute(f"SELECT dbo.isFirstEvent({xstr(position['AthleteID'])}, {parkrunID}, '{eventDate}')")
+            sql += ", FirstTimer"                
+            if firstTime:
+                values +=  ", 1"
+            else:
+                values += ", 0"
+            sql += ", NewPB"                
+            newPB = self.execute(f"SELECT dbo.isNewPB({xstr(position['AthleteID'])}, {parkrunID}, '{position['Time']}')")
+            if newPB:
+                values +=  ", 1"
+            else:
+                values +=  ", 0"
         sql += ")" + values + ")"
-        #print(sql)
         self.execute(sql)
 
     def updateParkrunEventPosition(self, position, addAthlete = True):
@@ -279,8 +307,17 @@ class Connection():
                     sql += f", AgeCategoryID = {xstr(self.getAgeCatID(position))}" 
                 if position['Age Grade'] is not  None:
                     sql += f", AgeGrade = {xstr(position['Age Grade'])}" 
-                if position['Note'] is not  None and position['Note'] != 'PB':
-                    sql += ", Comment = '" + position['Note'][:30].replace("'","") + "'" 
+                firstTime = self.execute(f"SELECT dbo.isFirstEvent({xstr(position['AthleteID'])}, {parkrunID}, '{eventDate}')")
+                if firstTime:
+                    sql +=  ", FirstTimer = 1"
+                else:
+                    sql += ", FirstTimer = 0"
+                newPB = self.execute(f"SELECT dbo.isNewPB({xstr(position['AthleteID'])}, {parkrunID}, '{GunTime}')")
+                if newPB:
+                    sql +=  ", NewPB = 1"
+                else:
+                    sql +=  ", NewPB = 0"
+
                 sql += f" WHERE EventID = {xstr(position['EventID'])} AND Position = {xstr(position['Pos'])}"
         
         #print(sql)
