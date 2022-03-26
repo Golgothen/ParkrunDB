@@ -260,12 +260,13 @@ class Connection():
                 values +=  ", 1"
             else:
                 values += ", 0"
-            sql += ", NewPB"                
-            newPB = self.execute(f"SELECT dbo.isNewPB({xstr(position['AthleteID'])}, {parkrunID}, '{position['Time']}')")
-            if newPB:
-                values +=  ", 1"
-            else:
-                values +=  ", 0"
+            sql += ", NewPB"
+            if not firstTime:                
+                newPB = self.execute(f"SELECT dbo.isNewPB({xstr(position['AthleteID'])}, {parkrunID}, '{position['Time']}')")
+                if newPB:
+                    values +=  ", 1"
+                else:
+                    values +=  ", 0"
         sql += ")" + values + ")"
         self.execute(sql)
 
