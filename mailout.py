@@ -200,6 +200,8 @@ def buildDetailParkrunReport(parkrun, node):
     
     data = c.execute(f"select * from getParkrunReportDetail('{parkrun}') order by EventCount desc")
 
+    offifialMilestone = c.execute(f"select dbo.getParkrunOfficialMilestone('{parkrun}')")
+    
     colgroups = {
         'Barcode<br>Name<br>Club<br>Last Run' : ['AthleteID', 'Name', 'ClubName', 'LastEventDate'],
         'Total<br>Home'                       : ['EventCount', 'RunCount'],
@@ -223,18 +225,37 @@ def buildDetailParkrunReport(parkrun, node):
     rowcount = 0
     for row in data:
         cls = ''
-        if 47 <= row['EventCount'] <= 49 or \
-           97 <= row['EventCount'] <= 99 or \
-           247 <= row['EventCount'] <= 249 or \
-           497 <= row['EventCount'] <= 499 or \
-           (7 <= row['EventCount'] <= 9 and row['AgeGroup'].lower() == 'junior') or \
-           97 <= row['RunCount'] <= 99:
-            cls = 'milestone'
-        else:
-            if rowcount == 0:
-                cls = 'altrow1'
+        if offifialMilestone:
+            if 47 <= row['EventCount'] <= 49 or \
+               97 <= row['EventCount'] <= 99 or \
+               247 <= row['EventCount'] <= 249 or \
+               497 <= row['EventCount'] <= 499 or \
+               (7 <= row['EventCount'] <= 9 and row['AgeGroup'].lower() == 'junior'): 
+                cls = 'milestone'
             else:
-                cls = 'altrow2'
+                if rowcount == 0:
+                    cls = 'altrow1'
+                else:
+                    cls = 'altrow2'
+        else:
+            if 47 <= row['EventCount'] <= 49 or \
+               97 <= row['EventCount'] <= 99 or \
+               147 <= row['EventCount'] <= 149 or \
+               197 <= row['EventCount'] <= 199 or \
+               247 <= row['EventCount'] <= 249 or \
+               297 <= row['EventCount'] <= 299 or \
+               347 <= row['EventCount'] <= 349 or \
+               397 <= row['EventCount'] <= 399 or \
+               447 <= row['EventCount'] <= 449 or \
+               497 <= row['EventCount'] <= 499 or \
+               (7 <= row['EventCount'] <= 9 and row['AgeGroup'].lower() == 'junior') or \
+               97 <= row['RunCount'] <= 99:
+                cls = 'milestone'
+            else:
+                if rowcount == 0:
+                    cls = 'altrow1'
+                else:
+                    cls = 'altrow2'
         tr = e.SubElement(t, 'tr', CLASS=cls)
         rowcount += 1
         if rowcount> 1:
@@ -263,8 +284,12 @@ def buildDetailParkrunReport(parkrun, node):
 
 def buildSummaryParkrunReport(parkrun, node):
     c = Connection(config)
-    data = c.execute(f"select * from getParkrunReportSummary('{parkrun}') order by EventCount desc")
-    
+    officialMilestone = c.execute(f"select dbo.getParkrunOfficialMilestone('{parkrun}')")
+    if officialMilestone:
+        data = c.execute(f"select * from getParkrunReportOfficialSummary('{parkrun}') order by EventCount desc")
+    else:
+        data = c.execute(f"select * from getParkrunReportSummary('{parkrun}') order by EventCount desc")
+
     colgroups = {
         'Barcode<br>Name<br>Club<br>Last Run' : ['AthleteID', 'Name', 'ClubName', 'LastEventDate'],
         'Total<br>Home'                       : ['EventCount', 'RunCount'],
@@ -765,16 +790,17 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
                     n.text += f"on their launch "
                 n.text += f"back on the {ordinal(row['PreviousRecordDate'].day)} of {row['PreviousRecordDate'].strftime('%B, %Y')}"
     
+    
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'Kudos to the vollies'
     vollyP = e.SubElement(sec, 'p')
-    
+
     sec = e.SubElement(body, 'div', {'class' : 'section'})
     p = e.SubElement(sec, 'h3')
     p.text = f'{region} Statesmanship Top {listSize}'
     #data = c.execute(f"SELECT * FROM getStatesmanReport({listSize}, '{region}') ORDER BY Rank, Weeks DESC, TQTY DESC")
-    data = c.execute(f"SELECT * FROM getStatesmanReport({listSize}, '{region}') ORDER BY Rank, TQTY DESC")
+    data = c.execute(f"SELECT * FROM getStatesmanReport({listSize}, '{region}') ORDER BY Rank, TQTY Desc")
     #data = c.execute(f"SELECT * FROM temptable ORDER BY Rank, TQTY DESC")
     
     vollies = {}
@@ -968,7 +994,7 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
                             s = e.SubElement(p, 'span')
                             s.text = "."
                 
-                """
+                
                 if j in ['AMELRank', 'AMELChange']:
                     if row['AMELChange'] > 0:
                         #cls += ' milestone50'
@@ -982,12 +1008,12 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
                             a.text = row['tmp']
                             s = e.SubElement(p, 'span')
                             s.text = "."
-                """
+                
                 if i == 'parkrun':
                     if row['LastRunParkrunThisWeek'] > 0:
                         s = e.SubElement(td, 'a', {'href' : f"{row['LastRunCountryURL']}{row['LastRunParkrunURL']}/results/latestresults/", 'target' : '_blank', 'rel' : 'noopener noreferrer'})
                         s.text = fstr(row['LastRunParkrun'])
-                        if row['EventChange'] > 0:
+                        if row['EventChange'] != 0:
                             s.attrib['class'] = 'newevent'
                         else:
                             s.attrib['class'] = 'athlete'
@@ -1070,59 +1096,61 @@ def buildWeeklyParkrunReport(region, listSize, extracols):
     td = e.SubElement(tr,'td')
     td.text = 'Rank'
     td = e.SubElement(tr,'td')
-    td.text = 'Statesmanshp ranking for this state.  Note: Non public and junior events will not count toward your ranking.'
+    td.text = 'Statesmanshp ranking for this region.  Rank is calculated by Local Events, Total Events, then Tourist Quotient this year. Note: Non public and junior events will not count toward your ranking.'
     tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
     td = e.SubElement(tr,'td')
+    """
     td.text = 'Weeks Held'
     td = e.SubElement(tr,'td')
     td.text = 'Number of consecutive weeks statesmanship has been held.  On weeks of a double launch, this gets reset to Zero. Note: Athletes with the same rank are secondly sorted by this column.'
     tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
     td = e.SubElement(tr,'td')
+    """
     td.text = 'Athlete'
     td = e.SubElement(tr,'td')
     td.text = "Athlete's name, linking to their profile page"
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
     td = e.SubElement(tr,'td')
     td.text = 'parkrun'
     td = e.SubElement(tr,'td')
-    td.text = "Last parkrun this athlete ran at, linking to that parkrun's latest result page. Note: If the athlete does not run this week, this will be blank. New parkruns in this state are shown in green, and volunteer parkruns (in any state) are shown in purple."
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    td.text = "Last parkrun this athlete ran at, linking to that parkrun's latest result page. Note: If the athlete does not run this week, this will be blank. New parkruns in this region are shown in green, and volunteer parkruns (in any region) are shown in purple."
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
     td = e.SubElement(tr,'td')
     td.text = 'Events Local/Total'
     td = e.SubElement(tr,'td')
-    td.text = 'Number of different events this athlete has completed.  Local will be in this state, Total will be globally.'
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    td.text = 'Number of different locations this athlete has completed.  Local will be in this region, Total will be globally.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
     td = e.SubElement(tr,'td')
     td.text = 'Total Runs'
     td = e.SubElement(tr,'td')
     td.text = 'Total number of parkruns completed'
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
     td = e.SubElement(tr,'td')
     td.text = 'Tourist Quotient Overall/20xx'
     td = e.SubElement(tr,'td')
-    td.text = 'Tourist Quotient is a percentage of parkruns completed that were new events. Interstate/international events contribute to this measure.  Total is for the entire history of the athlete, 20xx is for the current year.  Note: Athletes with the same rank and weeks are thirdly sorted by this column'
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    td.text = 'Tourist Quotient is a percentage of parkruns completed that were new events. Interstate/international events contribute to this measure.  Total is for the entire history of the athlete, 20xx is for the current year.'
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
     td = e.SubElement(tr,'td')
     td.text = '20xx Run/New'
     td = e.SubElement(tr,'td')
     td.text = 'These two sets of columns count the number of events and number of new events completed by this athlete for this year and last year.'
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
     td = e.SubElement(tr,'td')
     td.text = 'P Index'
     td = e.SubElement(tr,'td')
     td.text = 'P index measures the number of different events run a number of times. EG: 4 different events run 4 times each = 4, 6 different events run 6 times each = 6. etc.'
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
     td = e.SubElement(tr,'td')
     td.text = 'Wilson Index'
     td = e.SubElement(tr,'td')
     td.text = 'Highest event number completed in order starting at event 1 (a launch).  Completing an event number at any parkrun contributes to this index.'
-    tr = e.SubElement(tbl,'tr', {'class' : 'altrow1'})
+    tr = e.SubElement(tbl,'tr', {'class' : 'altrow2'})
     td = e.SubElement(tr,'td')
     if extracols:
         td.text = 'i&#179 index'
         td = e.SubElement(tr,'td')
         td.text = 'Highest number of parkruns completed in Australia in launch date order, starting at Main Beach.'
-        tr = e.SubElement(tbl,'tr', {'class' : 'altrow2 lastrow'})
+        tr = e.SubElement(tbl,'tr', {'class' : 'altrow1 lastrow'})
         td = e.SubElement(tr,'td')
         td.text = 'A.M.E.L Rank'
         td = e.SubElement(tr,'td')
@@ -1243,7 +1271,7 @@ def parkrunMilestoneMailout():
     
     
     
-    maillist = c.execute('SELECT Email, ParkrunName, Detailed from Parkruns WHERE Subscribed <> 0 AND Active = 1')
+    maillist = c.execute('SELECT Email, ParkrunName, Detailed, OfficialMilestones from Parkruns WHERE Subscribed <> 0 AND Active = 1')
     for m in maillist:
         root = e.Element('html', version = '5.0')
         head = e.SubElement(root, 'head')
@@ -1267,6 +1295,8 @@ def parkrunMilestoneMailout():
         p = e.SubElement(sec, 'p')
         p.text = "To all event teams, the report has been updated to include unofficial milestones, as many athletes celebrate them.  If you don't want these on the report then please let me know."
         p = e.SubElement(sec, 'p')
+        p.text = "I have also updated the volunteer table to show milestones of 50, 100, 250 and 500, however volunteer information is difficult to track and may be inaccurate."
+        p = e.SubElement(sec, 'p')
         p.text = "This email is automatically generated.  If you believe any of this information to be incorrect then please let me know by replying to this email address."
         p = e.SubElement(sec, 'p')
         p.text = "If you no longer wish to receive this email, or would like it sent to a different address, then again, just reply to this email and let me know."
@@ -1274,8 +1304,8 @@ def parkrunMilestoneMailout():
         s.text = StyleSheet
         sec = e.SubElement(body, 'div', {'class' : 'section'})
         addSig(sec)
-        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
-        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        #r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me',m['Email'], f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
+        r = gMail.SendMessage(service, 'me', gMail.CreateMessage('me','golgothen@gmail.com', f"Weekly Upcoming Milestone Report for {m['ParkrunName']}", lxml.html.tostring(root).decode('utf-8')))
         
         logger.info(f"{r['id']} sent to {m['Email']} for parkrun {m['ParkrunName']}")
     
@@ -1363,8 +1393,8 @@ def sendVicReport():
     
 if __name__ == '__main__':
     buildVicReport()
-    buildNZReport()
+    #buildNZReport()
     sendVicReport()
-    sendNZReport()
+    #sendNZReport()
      
     
